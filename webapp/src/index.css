@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-background text-textMain min-h-screen font-sans antialiased m-0 overflow-x-hidden p-0;
+  }
+}
+
+@layer components {
+  /* Glassmorphism panel premium */
+  .glass-panel {
+    @apply bg-surface backdrop-blur-glass border border-surfaceBorder rounded-2xl shadow-glass;
+  }
+}
+
+/* Custom background global effects */
+body::before {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: 
+    radial-gradient(circle at 50% 50%, rgba(0, 240, 255, 0.03) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(191, 0, 255, 0.05) 0%, transparent 40%);
+  z-index: -1;
+  pointer-events: none;
+}

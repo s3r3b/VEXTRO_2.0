@@ -1,0 +1,20 @@
+{
+  "name": "VEXTRO-Dev-Env",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "ms-azuretools.vscode-docker",
+        "ms-python.python",
+        "christian-kohler.npm-intellisense"
+      ]
+    }
+  },
+  "forwardPorts": [3000, 5050, 8081],
+  "remoteUser": "node",
+  "workspaceFolder": "/workspaces/VEXTRO"
+}
