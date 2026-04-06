@@ -1,15 +1,31 @@
+// Ścieżka: /workspaces/VEXTRO/frontend/src/screens/SettingsScreen.js
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, SafeAreaView, ScrollView, Image } from 'react-native';
+import { 
+  StyleSheet, View, Text, SafeAreaView, ScrollView, 
+  Image, TouchableOpacity, StatusBar, Platform 
+} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import CyberButton from '../components/CyberButton';
+import { 
+  User, Shield, Bell, MessageSquare, 
+  RefreshCcw, Bot, Laptop, LogOut, ChevronRight, QrCode, Palette
+} from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
 
+import { VextroTheme } from '../theme/colors';
+import CyberBackground from '../components/CyberBackground';
+import GlassView from '../components/GlassView';
+
+/**
+ * VEXTRO 3.0 SETTINGS DASHBOARD
+ * Futurystyczny interfejs konfiguracji terminala.
+ * Ikony Lucide służą jako placeholder pod Twoje własne pakiety ikon VEXTRO.
+ */
 export default function SettingsScreen({ navigation }) {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [nickname, setNickname] = useState('GHOST');
   const [profilePhoto, setProfilePhoto] = useState(null);
 
   useEffect(() => {
-    // Odświeżenie przy każdym pojawieniu się ekranu
     const loadProfile = async () => {
       const phone = await AsyncStorage.getItem('userPhone');
       if (phone) setPhoneNumber(phone);
@@ -27,86 +43,234 @@ export default function SettingsScreen({ navigation }) {
   }, [navigation]);
 
   const handleLogout = async () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     await AsyncStorage.clear();
     navigation.replace('Login');
   };
 
-  const menuItems = [
-    { icon: '🔑', label: 'Account', sub: 'Security notifications, change number', screen: 'Account' },
-    { icon: '🔒', label: 'Privacy', sub: 'Block contacts, disappearing messages', screen: 'Privacy' },
-    { icon: '💬', label: 'Chats', sub: 'Theme, wallpapers, chat history' },
-    { icon: '🔔', label: 'Notifications', sub: 'Message, group & call tones' },
-    { icon: '🔄', label: 'App Update', sub: 'Check for cyber-patches' },
-    { icon: '🤖', label: 'AI with private API', sub: 'Configure private AI integration', screen: 'AISettings' },
-    { icon: '🖥️', label: 'Linked Devices', sub: 'Scan QR to access VEXTRO Web', screen: 'QRScanner' },
-  ];
+  const SettingItem = ({ icon: Icon, label, sub, screen, color = VextroTheme.text }) => (
+    <TouchableOpacity 
+      style={styles.itemWrapper} 
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        if (screen) navigation.navigate(screen);
+      }}
+      activeOpacity={0.7}
+    >
+      <View style={styles.itemIconContainer}>
+        <Icon size={20} color={color} />
+      </View>
+      <View style={styles.itemTextContainer}>
+        <Text style={styles.itemLabel}>{label}</Text>
+        <Text style={styles.itemSub}>{sub}</Text>
+      </View>
+      <ChevronRight size={16} color={VextroTheme.surfaceBorder} />
+    </TouchableOpacity>
+  );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView>
-        {/* PROFILE HEADER SECTION */}
-        <CyberButton style={styles.profileSection} onPress={() => navigation.navigate('ProfileEdit')}>
-          <View style={styles.profileInfoRow}>
-            {profilePhoto ? (
-               <Image source={{ uri: profilePhoto }} style={styles.avatarImg} />
-            ) : (
-               <View style={styles.avatarPlaceholder}><Text style={styles.avatarText}>👤</Text></View>
-            )}
-            <View style={styles.nameContainer}>
-              <Text style={styles.nickname}>{nickname}</Text>
-              <Text style={styles.phoneLabel}>{phoneNumber}</Text>
-              <Text style={styles.statusLabel}>Online / Encrypted</Text>
-            </View>
-            <CyberButton style={styles.qrIconWrapper} onPress={() => navigation.navigate('QRScanner')}>
-              <Text style={styles.qrIcon}>🔳</Text>
-            </CyberButton>
+    <CyberBackground>
+      <StatusBar barStyle="light-content" />
+      <SafeAreaView style={styles.container}>
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          
+          {/* 3.0 IDENTITY CARD */}
+          <GlassView style={styles.profileCard}>
+            <TouchableOpacity 
+              onPress={() => navigation.navigate('ProfileEdit')}
+              style={styles.profileRow}
+            >
+              <View style={styles.avatarWrapper}>
+                {profilePhoto ? (
+                   <Image source={{ uri: profilePhoto }} style={styles.avatarImg} />
+                ) : (
+                   <View style={styles.avatarPlaceholder}>
+                      <User size={30} color={VextroTheme.primary} />
+                   </View>
+                )}
+                <View style={styles.onlineBadge} />
+              </View>
+              <View style={styles.profileMeta}>
+                <Text style={styles.nickname}>{nickname}</Text>
+                <Text style={styles.phoneLabel}>{phoneNumber}</Text>
+                <View style={styles.securityBadge}>
+                    <Shield size={10} color={VextroTheme.accent} />
+                    <Text style={styles.securityText}>IDENTITY VERIFIED</Text>
+                </View>
+              </View>
+              <TouchableOpacity 
+                style={styles.qrBtn}
+                onPress={() => navigation.navigate('QRScanner')}
+              >
+                <QrCode size={24} color={VextroTheme.primary} />
+              </TouchableOpacity>
+            </TouchableOpacity>
+          </GlassView>
+
+          {/* SETTINGS GROUPS */}
+          <View style={styles.section}>
+            <Text style={styles.sectionHeader}>CORE SECURITY</Text>
+            <GlassView intensity={10} style={styles.groupCard}>
+                <SettingItem 
+                    icon={Shield} 
+                    label="Account Security" 
+                    sub="Biometrics, 2FA, session control" 
+                    screen="Account"
+                    color={VextroTheme.accent}
+                />
+                <View style={styles.divider} />
+                <SettingItem 
+                    icon={Shield} 
+                    label="Privacy & Encryption" 
+                    sub="E2EE protocols, disappearing logs" 
+                    screen="Privacy"
+                    color={VextroTheme.accent}
+                />
+            </GlassView>
           </View>
-        </CyberButton>
 
-        {/* SETTINGS LIST */}
-        <View style={styles.settingsList}>
-          {menuItems.map((item, index) => (
-            <CyberButton key={index} style={styles.menuItem} onPress={() => item.screen ? navigation.navigate(item.screen) : null}>
-              <View style={styles.menuIconContainer}>
-                <Text style={styles.menuIcon}>{item.icon}</Text>
-              </View>
-              <View style={styles.menuTextContainer}>
-                <Text style={styles.menuLabel}>{item.label}</Text>
-                <Text style={styles.menuSub}>{item.sub}</Text>
-              </View>
-            </CyberButton>
-          ))}
-        </View>
+          <View style={styles.section}>
+            <Text style={styles.sectionHeader}>INTERFACE & DATA</Text>
+            <GlassView intensity={10} style={styles.groupCard}>
+                <SettingItem 
+                    icon={Palette} 
+                    label="Interface Synthesis" 
+                    sub="Typography, wallpapers, terminal physics" 
+                    screen="InterfaceSynthesis"
+                    color={VextroTheme.primary}
+                />
+                <View style={styles.divider} />
+                <SettingItem icon={Bell} label="Notifications" sub="Neon pulse, priority alerts" />
+                <View style={styles.divider} />
+                <SettingItem 
+                    icon={Laptop} 
+                    label="Linked Devices" 
+                    sub="Active VEXTRO Web sessions" 
+                    screen="QRScanner"
+                    color={VextroTheme.primary}
+                />
+            </GlassView>
+          </View>
 
-        {/* LOGOUT BUTTON */}
-        <CyberButton style={styles.logoutBtn} onPress={handleLogout}>
-          <Text style={styles.logoutBtnText}>[ TERMINATE CONNECTION ]</Text>
-        </CyberButton>
-      </ScrollView>
-    </SafeAreaView>
+          <View style={styles.section}>
+            <Text style={styles.sectionHeader}>EXPERIMENTAL</Text>
+            <GlassView intensity={10} style={styles.groupCard}>
+                <SettingItem 
+                    icon={Bot} 
+                    label="VEXTRO AI Integration" 
+                    sub="Private LLM endpoint configuration" 
+                    screen="AISettings"
+                    color={VextroTheme.primary}
+                />
+                <View style={styles.divider} />
+                <SettingItem icon={RefreshCcw} label="System Update" sub="Check for node patches" />
+            </GlassView>
+          </View>
+
+          {/* LOGOUT */}
+          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+              <LogOut size={18} color={VextroTheme.error} />
+              <Text style={styles.logoutText}>TERMINATE SESSION</Text>
+          </TouchableOpacity>
+
+          <Text style={styles.versionInfo}>VEXTRO OS CORE v3.0.0-PROD</Text>
+
+        </ScrollView>
+      </SafeAreaView>
+    </CyberBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#121212' },
-  profileSection: { backgroundColor: '#1A1A1A', padding: 20, borderBottomWidth: 1, borderBottomColor: '#B026FF', shadowColor: '#B026FF', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 5, marginBottom: 20 },
-  profileInfoRow: { flexDirection: 'row', alignItems: 'center' },
-  avatarImg: { width: 60, height: 60, borderRadius: 30, borderWidth: 2, borderColor: '#B026FF' },
-  avatarPlaceholder: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#121212', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#B026FF', shadowColor: '#B026FF', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 5 },
-  avatarText: { fontSize: 24 },
-  nameContainer: { flex: 1, marginLeft: 15 },
-  nickname: { color: '#fff', fontSize: 20, fontWeight: 'bold', textShadowColor: '#fff', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 2 },
-  phoneLabel: { color: '#B026FF', fontSize: 12, marginTop: 4, fontFamily: 'monospace' },
-  statusLabel: { color: '#888', fontSize: 10, marginTop: 2, fontFamily: 'monospace' },
-  qrIconWrapper: { padding: 10, justifyContent: 'center', alignItems: 'center' },
-  qrIcon: { fontSize: 28, color: '#B026FF', textShadowColor: '#B026FF', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 10 },
-  settingsList: { paddingHorizontal: 15, marginBottom: 30 },
-  menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: '#222' },
-  menuIconContainer: { width: 40, alignItems: 'center' },
-  menuIcon: { fontSize: 22 },
-  menuTextContainer: { flex: 1, marginLeft: 15 },
-  menuLabel: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  menuSub: { color: '#666', fontSize: 12, marginTop: 4, fontFamily: 'monospace' },
-  logoutBtn: { marginHorizontal: 20, marginTop: 20, marginBottom: 40, height: 50, backgroundColor: 'rgba(255, 0, 60, 0.1)', justifyContent: 'center', alignItems: 'center', borderRadius: 8, borderWidth: 1, borderColor: '#FF003C', shadowColor: '#FF003C', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 10 },
-  logoutBtnText: { color: '#FF003C', fontWeight: '900', letterSpacing: 2, textShadowColor: '#FF003C', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 5 }
+  container: { flex: 1 },
+  scrollContent: { padding: 24, paddingBottom: 60 },
+  profileCard: { padding: 20, marginBottom: 32 },
+  profileRow: { flexDirection: 'row', alignItems: 'center' },
+  avatarWrapper: { position: 'relative' },
+  avatarImg: { width: 66, height: 66, borderRadius: 22, borderWidth: 1, borderColor: VextroTheme.primary },
+  avatarPlaceholder: { 
+    width: 66, 
+    height: 66, 
+    borderRadius: 22, 
+    backgroundColor: 'rgba(255,255,255,0.05)', 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(191, 0, 255, 0.2)',
+  },
+  onlineBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: VextroTheme.success,
+    borderWidth: 3,
+    borderColor: '#040b14',
+  },
+  profileMeta: { flex: 1, marginLeft: 16 },
+  nickname: { color: VextroTheme.text, fontSize: 20, fontWeight: '900', letterSpacing: 0.5 },
+  phoneLabel: { color: VextroTheme.primary, fontSize: 11, fontWeight: '800', marginTop: 2, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
+  securityBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    backgroundColor: 'rgba(0, 240, 255, 0.05)',
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    alignSelf: 'flex-start',
+  },
+  securityText: { color: VextroTheme.accent, fontSize: 7, fontWeight: '900', marginLeft: 4, letterSpacing: 1 },
+  qrBtn: { padding: 10 },
+  section: { marginBottom: 24 },
+  sectionHeader: { 
+    color: VextroTheme.textMuted, 
+    fontSize: 9, 
+    fontWeight: '800', 
+    letterSpacing: 2, 
+    marginBottom: 12, 
+    marginLeft: 4,
+    opacity: 0.7
+  },
+  groupCard: { paddingHorizontal: 16, borderRadius: 20 },
+  itemWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 18,
+  },
+  itemIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  itemTextContainer: { flex: 1 },
+  itemLabel: { color: VextroTheme.text, fontSize: 14, fontWeight: '700' },
+  itemSub: { color: VextroTheme.textMuted, fontSize: 10, marginTop: 4, opacity: 0.8 },
+  divider: { height: 1, backgroundColor: 'rgba(191, 0, 255, 0.1)', marginLeft: 56 },
+  logoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+    paddingVertical: 20,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 0, 85, 0.2)',
+    backgroundColor: 'rgba(255, 0, 85, 0.03)',
+  },
+  logoutText: { color: VextroTheme.error, fontWeight: '900', fontSize: 12, letterSpacing: 2, marginLeft: 12 },
+  versionInfo: { 
+    textAlign: 'center', 
+    color: VextroTheme.textMuted, 
+    fontSize: 8, 
+    marginTop: 40, 
+    letterSpacing: 2,
+    opacity: 0.4
+  }
 });

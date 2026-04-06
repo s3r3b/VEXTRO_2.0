@@ -3,7 +3,6 @@
     "name": "frontend",
     "slug": "frontend",
     "version": "1.0.0",
-    "sdkVersion": "55.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -21,10 +20,20 @@
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
-      }
+      },
+      "softwareKeyboardLayoutMode": "resize",
+      "package": "com.vextro.app"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "c97b30eb-6541-4355-ad55-2838754c0222"
+      }
+    },
+    "plugins": [
+      "expo-secure-store"
+    ]
   }
 }

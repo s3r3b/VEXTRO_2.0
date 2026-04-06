@@ -4,22 +4,45 @@ const UserSchema = new mongoose.Schema({
   phoneNumber: {
     type: String,
     required: true,
-    unique: true, // Kluczowe dla synchronizacji kontaktów
-    trim: true
+    unique: true,
+    trim: true,
+    match: [/^\+[1-9]\d{1,14}$/, 'Format E.164 jest wymagany dla Shield Identity.']
   },
   publicKey: {
     type: String,
     required: true,
-    unique: true, // Twój dotychczasowy klucz unikalny
+    unique: true,
+  },
+  // X3DH: Signed Prekey (Rotated periodically, signed by Identity Key)
+  signedPreKey: {
+    key: { type: String },
+    signature: { type: String },
+    createdAt: { type: Date, default: Date.now }
+  },
+  // X3DH: One-time Prekeys (Consumed on session init)
+  oneTimePreKeys: [
+    {
+      key: { type: String },
+      id: { type: Number }
+    }
+  ],
+  displayName: {
+    type: String,
+    default: function() {
+       return this.phoneNumber;
+    }
   },
   lastSeen: {
     type: Date,
     default: Date.now,
   },
-  // Opcjonalnie: flaga statusu (np. dla Ghost Mode w przyszłości)
   isGhost: {
     type: Boolean,
     default: false
+  },
+  expoPushToken: {
+    type: String,
+    default: null
   }
 });
 

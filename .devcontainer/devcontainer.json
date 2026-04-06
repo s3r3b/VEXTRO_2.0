@@ -8,13 +8,35 @@
       "extensions": [
         "dbaeumer.vscode-eslint",
         "esbenp.prettier-vscode",
-        "ms-azuretools.vscode-docker",
-        "ms-python.python",
         "christian-kohler.npm-intellisense"
       ]
     }
   },
-  "forwardPorts": [3000, 5050, 8081],
+  "forwardPorts": [
+    5173,
+    5050,
+    8081
+  ],
+  "portsAttributes": {
+    "5173": {
+      "label": "WebApp (Vite)",
+      "onAutoForward": "notify"
+    },
+    "5050": {
+      "label": "VEXTRO Hub (Backend)",
+      "onAutoForward": "notify",
+      "visibility": "public"
+    },
+    "8081": {
+      "label": "Metro Bundler (Mobile)",
+      "onAutoForward": "notify"
+    }
+  },
   "remoteUser": "node",
-  "workspaceFolder": "/workspaces/VEXTRO"
+  "workspaceFolder": "/workspaces/VEXTRO",
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "configureZshAsDefaultShell": true
+    }
+  }
 }

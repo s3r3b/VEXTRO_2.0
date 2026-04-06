@@ -1,10 +1,15 @@
 {
   "dependencies": {
+    "axios": "^1.14.0",
     "cors": "^2.8.6",
     "crypto-js": "^4.2.0",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
+    "form-data": "^4.0.5",
     "mongoose": "^9.3.1",
+    "multer": "^2.1.1",
+    "node-bash-title": "^0.0.2",
+    "node-pty": "^1.1.0",
     "socket.io": "^4.8.3"
   },
   "name": "backend",
@@ -20,6 +25,7 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "ngrok": "^5.0.0-beta.2",
     "nodemon": "^3.1.14"
   }
 }

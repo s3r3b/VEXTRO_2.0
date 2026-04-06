@@ -2,30 +2,68 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --ui-scale: 1; /* Default 100% */
+}
+
 @layer base {
+  html {
+    font-size: calc(16px * var(--ui-scale));
+    @apply m-0 p-0 overflow-hidden h-[100dvh] w-screen;
+  }
   body {
-    @apply bg-background text-textMain min-h-screen font-sans antialiased m-0 overflow-x-hidden p-0;
+    @apply text-white min-h-[100dvh] font-sans antialiased m-0 p-0 overflow-hidden;
+    position: fixed;
+    inset: 0;
+    & ::selection {
+      background-color: rgba(191, 0, 255, 0.3);
+      color: var(--color-primary, #bf00ff);
+    }
+    background-color: var(--color-background, #040b14);
+    background-image: 
+      radial-gradient(at 0% 0%, var(--color-aura-top, rgba(191, 0, 255, 0.05)) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, var(--color-aura-bottom, rgba(0, 240, 255, 0.05)) 0px, transparent 50%);
+    transition: background-color 0.5s ease, background-image 0.5s ease;
   }
 }
 
 @layer components {
-  /* Glassmorphism panel premium */
-  .glass-panel {
-    @apply bg-surface backdrop-blur-glass border border-surfaceBorder rounded-2xl shadow-glass;
+  /* Premium Glassmorphism */
+  .glass-panel-heavy {
+    @apply bg-white/[0.02] backdrop-blur-2xl border border-white/10 rounded-2xl shadow-glass;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  }
+
+  .glass-panel-light {
+    @apply bg-white/[0.01] backdrop-blur-md border border-white/5 rounded-xl;
+  }
+
+  /* Kinetic Elements */
+  .neon-glow-primary {
+    filter: drop-shadow(0 0 8px rgba(191, 0, 255, 0.5));
+  }
+  
+  .neon-glow-accent {
+    filter: drop-shadow(0 0 8px rgba(0, 240, 255, 0.4));
+  }
+
+  .interactive-glow:hover {
+    @apply shadow-[0_0_30px_rgba(191,0,255,0.2)];
+    border-color: rgba(191, 0, 255, 0.3);
   }
 }
 
-/* Custom background global effects */
-body::before {
-  content: "";
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: 
-    radial-gradient(circle at 50% 50%, rgba(0, 240, 255, 0.03) 0%, transparent 50%),
-    radial-gradient(circle at 80% 20%, rgba(191, 0, 255, 0.05) 0%, transparent 40%);
+/* Background Kinetic Orbs */
+.bg-orb {
+  @apply absolute rounded-full blur-[120px] pointer-events-none animate-pulse;
   z-index: -1;
-  pointer-events: none;
+}
+
+@keyframes float-slow {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(20px, -20px); }
+}
+
+.animate-float {
+  animation: float-slow 10s ease-in-out infinite;
 }

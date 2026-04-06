@@ -1,0 +1,13 @@
+export { default as VxAvatarIcon } from './VxAvatarIcon';
+export { default as VxProfileIcon } from './VxProfileIcon';
+export { default as VxSecurityIcon } from './VxSecurityIcon';
+export { default as VxInterfaceIcon } from './VxInterfaceIcon';
+export { default as VxNeuralIcon } from './VxNeuralIcon';
+export { default as VxExitIcon } from './VxExitIcon';
+export { default as VxContactCardIcon } from './VxContactCardIcon';
+export { default as VxRadarIcon } from './VxRadarIcon';
+export { default as VxMediaIcon } from './VxMediaIcon';
+export { default as VxMuteIcon } from './VxMuteIcon';
+export { default as VxMoreIcon } from './VxMoreIcon';
+export { default as VxBackIcon } from './VxBackIcon';
+export { default as VxShortcutIcon } from './VxShortcutIcon';

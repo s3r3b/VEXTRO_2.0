@@ -2,29 +2,64 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
 
-// Endpoint do rejestracji klucza publicznego
-router.post('/register', async (req, res) => {
+// Endpoint do weryfikacji kodu i SEAMLESS IDENTITY (Login/Register)
+router.post('/verify-code', async (req, res) => {
   try {
-    const { publicKey } = req.body;
+    const { phoneNumber, code, publicKey } = req.body;
 
-    if (!publicKey) {
-      return res.status(400).json({ error: 'Brak klucza publicznego' });
+    if (!phoneNumber || !code || !publicKey) {
+      return res.status(400).json({ error: 'Brakujące dane: phoneNumber, code i publicKey są wymagane.' });
     }
 
-    // Sprawdzamy, czy użytkownik już istnieje
-    let user = await User.findOne({ publicKey });
+    // Normalizacja numeru (Cleaning non-numeric except '+')
+    const normalizedPhone = phoneNumber.replace(/[^\d+]/g, '');
+    const isAdmin = (normalizedPhone === '+48798884532' || normalizedPhone === '48798884532');
 
-    if (!user) {
-      user = new User({ publicKey });
-      await user.save();
-      console.log(`🛡️ VEXTRO: Nowy użytkownik zarejestrowany: ${publicKey.substring(0, 10)}...`);
-      return res.status(201).json({ message: 'Zarejestrowano pomyślnie' });
+    // MOCK: Weryfikacja kodu (8958 dla ADMINA, 1234 dla reszty)
+    if (isAdmin) {
+      console.log(`📡 [ADMIN_AUTH] Próba logowania tożsamości: ${normalizedPhone}`);
+    }
+    
+    const requiredCode = isAdmin ? '8958' : '1234';
+    if (code !== requiredCode) {
+      return res.status(401).json({ error: 'Nieprawidłowy kod weryfikacyjny dla tej tożsamości.' });
     }
 
-    res.status(200).json({ message: 'Użytkownik już istnieje' });
+    // Proba UPSERTU tożsamości Shield
+    let user;
+    try {
+      user = await User.findOneAndUpdate(
+        { phoneNumber },
+        { 
+          phoneNumber, 
+          publicKey,
+          lastSeen: new Date()
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true }
+      );
+    } catch (dbErr) {
+      if (dbErr.code === 11000) {
+        // Kolizja klucza publicznego z innym numerem
+        return res.status(409).json({ 
+          error: 'Shield Identity Conflict: Ten klucz publiczny jest już przypisany do innego numeru. Wygeneruj nową tożsamość lub użyj poprzedniego numeru.' 
+        });
+      }
+      throw dbErr;
+    }
+
+    console.log(`🛡️ VEXTRO: IDENTITY_SYNC: ${phoneNumber} [${user._id}]`);
+    
+    res.status(200).json({ 
+      message: 'Shield Identity Verified',
+      user: {
+        phoneNumber: user.phoneNumber,
+        publicKey: user.publicKey,
+        displayName: user.displayName || user.phoneNumber
+      }
+    });
   } catch (err) {
-    console.error('❌ Błąd rejestracji:', err);
-    res.status(500).json({ error: 'Błąd serwera' });
+    console.error('❌ Błąd weryfikacji:', err);
+    res.status(500).json({ error: 'Błąd serwera podczas weryfikacji tożsamości.' });
   }
 });
 

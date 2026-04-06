@@ -8,11 +8,12 @@
     "dev:mobile": "npm --prefix frontend run dev:tunnel",
     "dev:lan": "concurrently --raw -n \"BACKEND,WEB,MOBILE\" -c \"bgBlue.bold,bgCyan.bold,bgMagenta.bold\" \"npm run dev:backend\" \"npm run dev:web\" \"npm --prefix frontend run dev:lan\"",
     "dev:tunnel": "concurrently --raw -n \"BACKEND,WEB,MOBILE\" -c \"bgBlue.bold,bgCyan.bold,bgMagenta.bold\" \"npm run dev:backend\" \"npm run dev:web\" \"npm --prefix frontend run dev:tunnel\"",
-    "dev:pinggy": "bash scripts/dev-tunnel.sh",
-    "dev": "npm run dev:tunnel"
+    "dev:global": "concurrently --raw -n \"BACKEND,WEB,MOBILE\" -c \"bgRed.bold,bgGreen.bold,bgBlue.bold\" \"npm run dev:backend\" \"npm run dev:web\" \"npm --prefix frontend run dev:tunnel\"",
+    "kill-ports": "npx kill-port 5050 5173 8081 8082",
+    "predev": "npm run kill-ports",
+    "dev": "npm run dev:global"
   },
   "dependencies": {
-    "expo": "~51.0.39",
     "mongodb": "^7.1.0"
   },
   "devDependencies": {

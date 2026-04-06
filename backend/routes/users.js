@@ -58,4 +58,28 @@ router.get('/all', async (req, res) => {
   }
 });
 
+/**
+ * PATCH /api/users/pushtoken
+ * Rejestruje lub aktualizuje natywny token (ExpoPushToken) dla podanego numeru
+ */
+router.patch('/pushtoken', async (req, res) => {
+  const { phoneNumber, expoPushToken } = req.body;
+  if (!phoneNumber) return res.status(400).json({ error: 'Nie podano numeru' });
+
+  try {
+    const updatedUser = await User.findOneAndUpdate(
+      { phoneNumber },
+      { $set: { expoPushToken } },
+      { new: true }
+    );
+    if (!updatedUser) {
+       return res.status(404).json({ error: 'Użytkownik nie istnieje w VEXTRO' });
+    }
+    res.json({ success: true, message: 'Push Token zaktualizowany' });
+  } catch (err) {
+    console.error("Błąd zapisu tokena push:", err);
+    res.status(500).json({ error: 'Błąd po stronie bazy.' });
+  }
+});
+
 module.exports = router;

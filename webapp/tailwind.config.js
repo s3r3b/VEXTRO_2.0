@@ -7,12 +7,12 @@ export default {
   theme: {
     extend: {
       colors: {
-        background: '#040b14', // very dark deep space blue
-        surface: 'rgba(15, 10, 30, 0.4)', // transparent container with purple tint
-        surfaceBorder: 'rgba(191, 0, 255, 0.15)',
-        primary: '#bf00ff', // Vivid Purple neon
-        secondary: '#7000ff', // Deep Purple neon
-        accent: '#00f0ff', // Minimal Cyan accent
+        background: 'var(--color-background, #040b14)',
+        surface: 'rgba(15, 10, 30, 0.4)',
+        surfaceBorder: 'var(--color-surface-border, rgba(191, 0, 255, 0.15))',
+        primary: 'var(--color-primary, #bf00ff)',
+        secondary: 'var(--color-secondary, #7000ff)',
+        accent: 'var(--color-accent, #00f0ff)',
         textMain: '#ffffff',
         textMuted: '#8892b0',
       },
