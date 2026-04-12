@@ -26,9 +26,9 @@ Status: Pending user approval.
 [x]   - Fetching bundles: A dedicated `GET /api/keys/:phone` route is required.
 [x] - **Legacy Cleanup**: The file `backend/crypto.js` was acknowledged as a legacy text placeholder from early test-driven symmetric encryption attempts. Since the frontend now relies on a pure Double Ratchet engine, `crypto.js` has been removed. The backend does not encrypt or decrypt messages; it only verifies signatures and relays keys.
 
-[ ] ## PHASE 3: TECHNICAL DESIGN
-[ ] ### 1. DATABASE SCHEMA (Mongoose)
-[ ] We will leverage the existing `User` model, which correctly defines the needed fields:
+[x] ## PHASE 3: TECHNICAL DESIGN
+[x] ### 1. DATABASE SCHEMA (Mongoose)
+[x] We will leverage the existing `User` model, which correctly defines the needed fields:
 ```javascript
 // Inside models/User.js (Existing)
 publicKey: { type: String, required: true, unique: true }, // IK_B
@@ -44,12 +44,12 @@ oneTimePreKeys: [
   }
 ]
 ```
-[ ] No schema changes are required, ensuring backwards compatibility and minimizing surface area for bugs.
+[x] No schema changes are required, ensuring backwards compatibility and minimizing surface area for bugs.
 
-[ ] ### 2. API SPEC (New Route: `routes/keys.js`)
-[ ] **A. Upload PreKey Bundle**
-[ ] - **Endpoint**: `POST /api/keys/upload`
-[ ] - **Payload**:
+[x] ### 2. API SPEC (New Route: `routes/keys.js`)
+[x] **A. Upload PreKey Bundle**
+[x] - **Endpoint**: `POST /api/keys/upload`
+[x] - **Payload**:
   ```json
   {
     "phoneNumber": "+48123456789",
@@ -64,27 +64,27 @@ oneTimePreKeys: [
     ]
   }
   ```
-[ ] - **Logic**: 
-[ ]   1. Validate that the provided `identityKey` matches the one in the database for the given user.
-[ ]   2. Verify the SPK signature using the Identity Key to prevent junk uploads.
-[ ]   3. Update `signedPreKey` and append/replace `oneTimePreKeys` (truncating at 100 to prevent DoS).
+[x] - **Logic**: 
+[x]   1. Validate that the provided `identityKey` matches the one in the database for the given user.
+[x]   2. Verify the SPK signature using the Identity Key to prevent junk uploads.
+[x]   3. Update `signedPreKey` and append/replace `oneTimePreKeys` (truncating at 100 to prevent DoS).
 
-[ ] **B. Fetch PreKey Bundle**
-[ ] - **Endpoint**: `GET /api/keys/:phone`
-[ ] - **Logic**: 
-[ ]   1. Find user by `phoneNumber`.
-[ ]   2. Extract `identityKey` (`publicKey`) and `signedPreKey`.
-[ ]   3. Pop (remove) the first `oneTimePreKey` from the array (FIFO).
-[ ]   4. Atomically save the user state.
-[ ]   5. Return the bundle. If `oneTimePreKeys` is empty, return bundle without `oneTimePreKey`.
+[x] **B. Fetch PreKey Bundle**
+[x] - **Endpoint**: `GET /api/keys/:phone`
+[x] - **Logic**: 
+[x]   1. Find user by `phoneNumber`.
+[x]   2. Extract `identityKey` (`publicKey`) and `signedPreKey`.
+[x]   3. Pop (remove) the first `oneTimePreKey` from the array (FIFO).
+[x]   4. Atomically save the user state.
+[x]   5. Return the bundle. If `oneTimePreKeys` is empty, return bundle without `oneTimePreKey`.
 
-[ ] ### 3. VALIDATION (Signature Verification)
-[ ] - **Library**: `tweetnacl` will be installed, as standard Node.js `crypto` with Ed25519 can be inconsistent with raw libsodium/nacl buffers produced by React Native clients. `tweetnacl` guarantees byte-for-byte compatibility with standard Double Ratchet/X3DH implementations (like `libsodium-wrappers` or Expo Crypto).
-[ ] - **Implementation**: We will create a utility in `backend/utils/x3dhVerify.js` (to clearly distinguish from the old legacy crypto.js) that exposes a function to check `tweetnacl.sign.detached.verify(...)`.
+[x] ### 3. VALIDATION (Signature Verification)
+[x] - **Library**: `tweetnacl` will be installed, as standard Node.js `crypto` with Ed25519 can be inconsistent with raw libsodium/nacl buffers produced by React Native clients. `tweetnacl` guarantees byte-for-byte compatibility with standard Double Ratchet/X3DH implementations (like `libsodium-wrappers` or Expo Crypto).
+[x] - **Implementation**: We will create a utility in `backend/utils/x3dhVerify.js` (to clearly distinguish from the old legacy crypto.js) that exposes a function to check `tweetnacl.sign.detached.verify(...)`.
 
 [x] ## PENDING ACTION ITEMS (PHASE 4)
 [x] - [x] Install `tweetnacl` library in `/backend`.
-[ ] - [ ] Implement signature validation utility in `backend/utils/x3dhVerify.js`.
-[ ] - [ ] Create `backend/routes/keys.js` with `upload` and `fetch` endpoints.
-[ ] - [ ] Mount `/api/keys` in `backend/server.js`.
-[ ] - [ ] Fix `package.json` main entry (currently pointing to deleted `crypto.js`) to `server.js`.
+[x] - [x] Implement signature validation utility in `backend/utils/x3dhVerify.js`.
+[x] - [x] Create `backend/routes/keys.js` with `upload` and `fetch` endpoints.
+[x] - [x] Mount `/api/keys` in `backend/server.js`.
+[x] - [x] Fix `package.json` main entry (currently pointing to deleted `crypto.js`) to `server.js`.

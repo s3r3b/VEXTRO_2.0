@@ -16,7 +16,7 @@
   "name": "backend",
   "version": "0.6.2",
   "description": "VEXTRO Cyberpunk Encrypted Messenger Backend",
-  "main": "crypto.js",
+  "main": "server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js",

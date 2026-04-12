@@ -52,6 +52,7 @@ app.use('/api/contacts', require('./routes/contacts'));
 app.use('/api/groups', require('./routes/groups'));
 app.use('/api/messages', require('./routes/messages'));
 app.use('/api/media', require('./routes/media')); // Nowa trasa dla audio/obrazów
+app.use('/api/keys', require('./routes/keys')); // Nowa trasa dla kluczy E2EE (X3DH)
 
 // Prosty testowy endpoint (Healthcheck)
 app.get('/', (req, res) => {
