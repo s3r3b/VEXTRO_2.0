@@ -4,8 +4,11 @@ import {
   KeyboardAvoidingView, Platform, TouchableOpacity, StatusBar
 } from 'react-native';
 import { 
-  ChevronLeft, ShieldCheck, SendHorizonal, Users, MoreHorizontal
-} from 'lucide-react-native';
+  VxBackIcon, 
+  VxSecurityIcon, 
+  VxMoreIcon 
+} from '../components/ui/icons/static';
+import { VxSendIcon } from '../components/ui/icons/kinetic';
 import io from 'socket.io-client';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -73,8 +76,7 @@ export default function GroupChatScreen({ route, navigation }) {
     if (!myPhone || !isReady) return;
 
     const socket = io(NetworkConfig.getSocketUrl(), {
-      transports: ['websocket'],
-      extraHeaders: NetworkConfig.getBypassHeaders()
+      transports: ['websocket']
     });
     socketRef.current = socket;
 
@@ -99,27 +101,32 @@ export default function GroupChatScreen({ route, navigation }) {
 
     return () => socket.disconnect();
   }, [myPhone, isReady, groupId]);
+const handleSend = useCallback(() => {
+  if (!inputText.trim()) return;
 
-  const sendMessage = useCallback(async () => {
-    if (!inputText.trim()) return;
-    const text = inputText.trim();
-    setInputText('');
+  const text = inputText.trim();
+  setInputText('');
 
-    let msgPayload = { sender: myPhone, roomId: groupId, content: text, timestamp: new Date() };
-    
-    // Szyfrowanie symetryczne grupowym sekretem
-    if (groupKeys[groupId]) {
-      try {
-        const { ciphertext, nonce } = encryptForGroup(groupId, text);
-        msgPayload = { ...msgPayload, content: ciphertext, nonce: nonce, isEncrypted: true };
-      } catch (e) {
-        console.error('🛡️ [SHIELD] Błąd szyfrowania grupy', e);
-      }
-    }
+  let msgPayload = { sender: myPhone, roomId: groupId, content: text, timestamp: new Date() };
 
-    socketRef.current?.emit('send_group_message', msgPayload);
-    setMessages(prev => [...prev, { ...msgPayload, content: text, id: Date.now().toString(), status: 'sent' }]);
-  }, [inputText, myPhone, groupId, groupKeys]);
+  // Szyfrowanie symetryczne grupowym sekretem (ENFORCED)
+  if (!groupKeys[groupId]) {
+    alert("Brak klucza grupowego. Zapadnia zamknięta.");
+    return; // Przerwij wysyłanie jawnego tekstu
+  }
+
+  try {
+    const { ciphertext, nonce } = encryptForGroup(groupId, text);
+    const encryptedPayload = { ...msgPayload, content: ciphertext, nonce: nonce, isEncrypted: true };
+    socketRef.current?.emit('send_group_message', encryptedPayload);
+  } catch (e) {
+    console.error('🛡️ [SHIELD] Błąd szyfrowania grupy', e);
+    alert("Błąd kryptograficzny. Wiadomość NIE została wysłana.");
+    return; // Przerwij wysyłanie jawnego tekstu
+  }
+
+  setMessages(prev => [...prev, { ...msgPayload, id: Date.now().toString(), status: 'sent' }]);
+}, [inputText, myPhone, groupId, groupKeys, encryptForGroup]);
 
   const handleMenuAction = async (actionKey) => {
     switch(actionKey) {
@@ -184,20 +191,20 @@ export default function GroupChatScreen({ route, navigation }) {
       <SafeAreaView style={styles.container}>
         <GlassView intensity={15} style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <ChevronLeft size={24} color={VextroTheme.text} />
+            <VxBackIcon size={24} color={VextroTheme.text} />
           </TouchableOpacity>
           <View style={styles.headerInfo}>
             <View style={styles.headerTitleRow}>
-              <Users size={16} color={VextroTheme.primary} style={{ marginRight: 6 }} />
+              <VxSecurityIcon size={16} color={VextroTheme.primary} style={{ marginRight: 6 }} />
               <ScaledText style={styles.headerTitle}>{groupName || 'Grupa'}</ScaledText>
             </View>
             <ScaledText style={styles.headerSubtitle}>
               {isConnected ? 'WĘZEŁ ONLINE' : 'ŁĄCZENIE...'}
             </ScaledText>
           </View>
-          <ShieldCheck size={24} color={groupKeys[groupId] ? VextroTheme.primary : VextroTheme.textMuted} style={{ marginRight: 12 }} />
+          <VxSecurityIcon size={24} color={groupKeys[groupId] ? VextroTheme.primary : VextroTheme.textMuted} style={{ marginRight: 12 }} />
           <TouchableOpacity onPress={() => setMenuVisible(true)}>
-            <MoreHorizontal color={VextroTheme.textMuted} size={24} />
+            <VxMoreIcon color={VextroTheme.textMuted} size={24} />
           </TouchableOpacity>
         </GlassView>
 
@@ -210,7 +217,7 @@ export default function GroupChatScreen({ route, navigation }) {
           onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
         />
 
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <GlassView intensity={20} style={styles.inputSection}>
             <TextInput
               style={styles.input}
@@ -227,7 +234,7 @@ export default function GroupChatScreen({ route, navigation }) {
               style={[styles.sendBtn, !inputText.trim() && styles.sendBtnDisabled]}
               disabled={!inputText.trim()}
             >
-              <SendHorizonal size={20} color={inputText.trim() ? VextroTheme.primary : VextroTheme.textMuted} />
+              <VxSendIcon size={20} color={inputText.trim() ? VextroTheme.primary : VextroTheme.textMuted} />
             </TouchableOpacity>
           </GlassView>
         </KeyboardAvoidingView>

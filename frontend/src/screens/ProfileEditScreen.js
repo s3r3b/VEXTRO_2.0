@@ -8,7 +8,13 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import QRCode from 'react-native-qrcode-svg';
-import { Camera, Trash2, UserCheck, QrCode, ShieldCheck, Fingerprint } from 'lucide-react-native';
+import { 
+  VxProfileIcon, 
+  VxSecurityIcon, 
+  VxRadarIcon, 
+  VxInterfaceIcon 
+} from '../components/ui/icons/static';
+import { VxPurgeIcon } from '../components/ui/icons/kinetic';
 import * as Haptics from 'expo-haptics';
 
 import { VextroTheme } from '../theme/colors';
@@ -76,11 +82,10 @@ export default function ProfileEditScreen() {
     <CyberBackground>
       <StatusBar barStyle="light-content" />
       <SafeAreaView style={styles.container}>
-        <KeyboardAvoidingView 
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.flex}
-        >
-          <ScrollView contentContainerStyle={styles.scroll}>
+        >          <ScrollView contentContainerStyle={styles.scroll}>
             
             {/* 3.0 AVATAR HUD */}
             <View style={styles.avatarSection}>
@@ -90,17 +95,17 @@ export default function ProfileEditScreen() {
                     <Image source={{ uri: profilePhoto }} style={styles.avatarImg} />
                  ) : (
                     <View style={styles.avatarPlaceholder}>
-                       <Fingerprint size={48} color={VextroTheme.primary} opacity={0.3} />
+                       <VxSecurityIcon size={48} color={VextroTheme.primary} opacity={0.3} />
                     </View>
                  )}
                  <View style={styles.editBadge}>
-                    <Camera size={14} color={VextroTheme.background} />
+                    <VxInterfaceIcon size={14} color={VextroTheme.background} />
                  </View>
               </TouchableOpacity>
               
               {profilePhoto && (
                 <TouchableOpacity onPress={handleRemoveImage} style={styles.removeBtn}>
-                  <Trash2 size={12} color={VextroTheme.error} style={{marginRight: 6}} />
+                  <VxPurgeIcon size={12} color={VextroTheme.error} style={{marginRight: 6}} shaking={false} />
                   <Text style={styles.removeText}>PURGE AVATAR DATA</Text>
                 </TouchableOpacity>
               )}
@@ -120,7 +125,7 @@ export default function ProfileEditScreen() {
                             selectionColor={VextroTheme.primary}
                         />
                         <TouchableOpacity style={styles.saveBtn} onPress={handleSaveNickname}>
-                            <UserCheck size={20} color={VextroTheme.background} />
+                            <VxProfileIcon size={20} color={VextroTheme.background} />
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -129,7 +134,7 @@ export default function ProfileEditScreen() {
                     <Text style={styles.label}>TERMINAL ADDRESS (READ-ONLY)</Text>
                     <View style={styles.readOnlyBox}>
                         <Text style={styles.readOnlyText}>{phoneNumber || 'SEARCHING NODE...'}</Text>
-                        <ShieldCheck size={14} color={VextroTheme.accent} />
+                        <VxSecurityIcon size={14} color={VextroTheme.accent} />
                     </View>
                 </View>
             </GlassView>
@@ -137,7 +142,7 @@ export default function ProfileEditScreen() {
             {/* IDENTITY SHARING (QR) */}
             <View style={styles.qrSection}>
                 <View style={styles.qrHeader}>
-                    <QrCode size={16} color={VextroTheme.primary} style={{marginRight: 8}} />
+                    <VxRadarIcon size={16} color={VextroTheme.primary} style={{marginRight: 8}} />
                     <Text style={styles.qrHeaderTitle}>IDENTITY HANDSHAKE</Text>
                 </View>
                 <GlassView intensity={10} style={styles.qrBox}>

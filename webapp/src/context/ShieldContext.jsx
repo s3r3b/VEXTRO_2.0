@@ -2,6 +2,7 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import nacl from 'tweetnacl';
 import { Buffer } from 'buffer';
 import { ShieldSession } from '../utils/ShieldEngine';
+import SecurityService from '../services/SecurityService';
 
 const ShieldContext = createContext();
 
@@ -10,29 +11,6 @@ export const ShieldProvider = ({ children }) => {
   const [sessions, setSessions] = useState({}); // { contactId: ShieldSession }
   const [groupKeys, setGroupKeys] = useState({}); // { groupId: UInt8Array }
   const [isReady, setIsReady] = useState(false);
-
-  // 1. Initialize Identity
-  useEffect(() => {
-    const init = async () => {
-      let pubKey = localStorage.getItem('vextro_identity_public');
-      let privKey = localStorage.getItem('vextro_identity_private');
-
-      if (!pubKey || !privKey) {
-        console.log('🛡️ [SHIELD WEB] GENERATING_IDENTITY: Industrial-grade keys...');
-        const keyPair = nacl.box.keyPair();
-        pubKey = Buffer.from(keyPair.publicKey).toString('base64');
-        privKey = Buffer.from(keyPair.secretKey).toString('base64');
-
-        localStorage.setItem('vextro_identity_public', pubKey);
-        localStorage.setItem('vextro_identity_private', privKey);
-      }
-
-      setIdentity({ publicKey: pubKey });
-      loadSessions();
-      setIsReady(true);
-    };
-    init();
-  }, []);
 
   // 2. Load Sessions from storage
   const loadSessions = () => {
@@ -63,6 +41,19 @@ export const ShieldProvider = ({ children }) => {
       console.error('🛡️ [SHIELD WEB] SESSION_SAVE_ERROR:', e);
     }
   };
+
+  // 1. Initialize Identity
+  useEffect(() => {
+    const init = async () => {
+      const keys = SecurityService.initializeKeys();
+      if (keys && keys.publicKey) {
+        setIdentity({ publicKey: keys.publicKey });
+      }
+      loadSessions();
+      setIsReady(true);
+    };
+    init();
+  }, []);
 
   /**
    * Start a new E2EE session with a contact

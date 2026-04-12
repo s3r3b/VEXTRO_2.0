@@ -6,9 +6,15 @@ import {
   KeyboardAvoidingView, Platform, Alert
 } from 'react-native';
 import { 
-  Search, Settings, MessageSquarePlus, UserPlus, 
-  Users, Radio, X, Terminal, Cpu 
-} from 'lucide-react-native';
+  VxRadarIcon, 
+  VxProfileIcon, 
+  VxSecurityIcon, 
+  VxNeuralIcon, 
+  VxInterfaceIcon, 
+  VxBackIcon, 
+  VxShortcutIcon 
+} from '../components/ui/icons/static';
+import { VxGearIcon } from '../components/ui/icons/kinetic';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { 
@@ -29,22 +35,24 @@ import ScaledText from '../components/ScaledText';
 import ContactsService from '../services/ContactsService';
 import GroupService from '../services/GroupService';
 
-// ─── STAŁY KONTAKT AI (zawsze widoczny na górze) ─────────────────────────────
-const AI_CONTACT = {
-  _id: 'vextro-ai',
-  contactPhone: 'AI',
-  displayName: 'VEXTRO AI',
-  isAI: true,
-  online: true,
-  lastMessage: { content: 'Neural engine gotowy.', timestamp: null },
-};
-
 export default function ContactsScreen({ navigation }) {
   const [myPhone, setMyPhone] = useState('');
   const [contacts, setContacts] = useState([]);
   const [groups, setGroups] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+
+  // ─── AI CONFIG STATE ───────────────────────────────────────────────────────
+  const [aiConfig, setAiConfig] = useState({ enabled: false, nick: 'YOUR API CHATBOT AI' });
+
+  const loadAiConfig = async () => {
+    const enabled = await AsyncStorage.getItem('ai_enabled');
+    const nick = await AsyncStorage.getItem('ai_nick');
+    setAiConfig({
+      enabled: enabled === 'true',
+      nick: nick || 'YOUR API CHATBOT AI'
+    });
+  };
 
   // ─── LOGIKA ANIMOWANEGO SZUKANIA ──────────────────────────────────────────
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
@@ -93,6 +101,7 @@ export default function ContactsScreen({ navigation }) {
   // ─── ŁADOWANIE SIECI (Kontakty + Grupy) ──────────────────────────────────────
   const loadData = useCallback(async (phone) => {
     setIsLoading(true);
+    await loadAiConfig(); // Załaduj też config AI
     const [freshContacts, freshGroups] = await Promise.all([
       ContactsService.getContacts(phone),
       GroupService.getGroups(phone)
@@ -117,16 +126,29 @@ export default function ContactsScreen({ navigation }) {
     // Odśwież po powrocie na ekran (np. po zakończeniu chatu)
     const unsubscribe = navigation.addListener('focus', () => {
       if (myPhone) loadData(myPhone);
+      else loadAiConfig();
     });
     return unsubscribe;
   }, [navigation, myPhone, loadData]);
 
   // ─── FILTROWANIE ────────────────────────────────────────────────────────────
-  const combinedNodes = [
-    AI_CONTACT,
+  const combinedNodes = [];
+  
+  if (aiConfig.enabled) {
+    combinedNodes.push({
+      _id: 'vextro-ai',
+      contactPhone: 'AI',
+      displayName: aiConfig.nick,
+      isAI: true,
+      online: true,
+      lastMessage: { content: 'Neural engine gotowy.', timestamp: null },
+    });
+  }
+
+  combinedNodes.push(
     ...groups.map(g => ({ ...g, isGroup: true, displayName: g.groupName })),
     ...contacts
-  ];
+  );
 
   const filteredContacts = combinedNodes.filter(c =>
     c.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -160,9 +182,12 @@ export default function ContactsScreen({ navigation }) {
       style={styles.contactWrapper}
     >
       <GlassView intensity={10} style={styles.contactCard}>
-        {/* Avatar */}
         <View style={styles.avatarWrapper}>
-          <Text style={styles.avatarText}>{item.isAI ? '🤖' : (item.isGroup ? '🛡️' : '👤')}</Text>
+          {item.isAI ? (
+            <VxNeuralIcon size={30} />
+          ) : (
+            item.isGroup ? <VxSecurityIcon size={30} /> : <VxProfileIcon size={30} />
+          )}
           {item.isAI && <View style={styles.onlinePulse} />}
         </View>
 
@@ -184,7 +209,7 @@ export default function ContactsScreen({ navigation }) {
           </ScaledText>
         </View>
 
-        <ChevronRight size={18} color={VextroTheme.surfaceBorder} />
+        <VxBackIcon size={18} color={VextroTheme.surfaceBorder} style={{ transform: [{ rotate: '180deg' }] }} />
       </GlassView>
     </TouchableOpacity>
   );
@@ -192,7 +217,7 @@ export default function ContactsScreen({ navigation }) {
   // ─── EMPTY STATE ────────────────────────────────────────────────────────────
   const EmptyState = () => (
     <View style={styles.emptyState}>
-      <Text style={styles.emptyIcon}>📡</Text>
+      <VxRadarIcon size={48} color={VextroTheme.primary} />
       <ScaledText style={styles.emptyTitle}>SIEĆ PUSTA</ScaledText>
       <ScaledText style={styles.emptySubtitle}>
         Dodaj pierwszy kontakt klikając przycisk +
@@ -217,14 +242,14 @@ export default function ContactsScreen({ navigation }) {
                 onPress={() => navigation.navigate('Terminal')}
                 style={styles.adminBtn}
               >
-                <Cpu color={VextroTheme.accent} size={24} />
+                <VxNeuralIcon size={24} color={VextroTheme.accent} />
               </TouchableOpacity>
             )}
             <TouchableOpacity
               onPress={() => navigation.navigate('Settings')}
               style={styles.settingsBtn}
             >
-              <Settings color={VextroTheme.primary} size={24} />
+                <VxGearIcon size={24} color={VextroTheme.primary} spinning={false} />
             </TouchableOpacity>
           </View>
         </View>
@@ -239,7 +264,7 @@ export default function ContactsScreen({ navigation }) {
             <Animated.View style={[styles.animatedSearchWrapper, animatedSearchStyle]}>
               <GlassView intensity={20} style={styles.searchInner}>
                 <TouchableOpacity onPress={toggleSearch} style={styles.searchIconBtn}>
-                  <Search size={22} color={isSearchExpanded ? VextroTheme.primary : VextroTheme.textMuted} />
+                  <VxRadarIcon size={22} color={isSearchExpanded ? VextroTheme.primary : VextroTheme.textMuted} />
                 </TouchableOpacity>
 
                 {isSearchExpanded && (
@@ -255,7 +280,7 @@ export default function ContactsScreen({ navigation }) {
                     />
                     {searchQuery.length > 0 && (
                       <TouchableOpacity onPress={() => setSearchQuery('')} style={{ padding: 4 }}>
-                        <X size={18} color={VextroTheme.text} />
+                        <VxBackIcon size={18} color={VextroTheme.text} style={{ transform: [{ rotate: '180deg' }] }} />
                       </TouchableOpacity>
                     )}
                   </View>
@@ -273,7 +298,7 @@ export default function ContactsScreen({ navigation }) {
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
           />
-          <Radio size={12} color={VextroTheme.primary} />
+          <VxRadarIcon size={12} color={VextroTheme.primary} />
           <Text style={styles.protocolText}>
             VEXTRO v3.0.0-PROD // {contacts.length} SECURE NODE{contacts.length !== 1 ? 'S' : ''} ACTIVE
           </Text>
@@ -308,7 +333,7 @@ export default function ContactsScreen({ navigation }) {
             colors={[VextroTheme.primary, VextroTheme.secondary]}
             style={styles.fabGradient}
           >
-            <MessageSquarePlus size={24} color={VextroTheme.background} />
+            <VxShortcutIcon size={24} color={VextroTheme.background} />
           </LinearGradient>
         </TouchableOpacity>
 

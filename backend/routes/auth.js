@@ -29,9 +29,9 @@ router.post('/verify-code', async (req, res) => {
     let user;
     try {
       user = await User.findOneAndUpdate(
-        { phoneNumber },
+        { phoneNumber: normalizedPhone },
         { 
-          phoneNumber, 
+          phoneNumber: normalizedPhone, 
           publicKey,
           lastSeen: new Date()
         },
@@ -47,7 +47,7 @@ router.post('/verify-code', async (req, res) => {
       throw dbErr;
     }
 
-    console.log(`🛡️ VEXTRO: IDENTITY_SYNC: ${phoneNumber} [${user._id}]`);
+    console.log(`🛡️ VEXTRO: IDENTITY_SYNC: ${normalizedPhone} [${user._id}]`);
     
     res.status(200).json({ 
       message: 'Shield Identity Verified',

@@ -15,6 +15,7 @@ nacl.setPRNG((x, n) => {
 
 import { Buffer } from 'buffer';
 import { ShieldSession } from '../utils/ShieldEngine';
+import SecurityService from '../services/SecurityService';
 
 const ShieldContext = createContext();
 
@@ -23,63 +24,6 @@ export const ShieldProvider = ({ children }) => {
   const [sessions, setSessions] = useState({}); // { contactId: ShieldSession }
   const [groupKeys, setGroupKeys] = useState({}); // { groupId: UInt8Array (Symmetric Key) }
   const [isReady, setIsReady] = useState(false);
-
-  // 1. Initialize Identity
-  useEffect(() => {
-    const init = async () => {
-      try {
-        console.log('🛡️ [SHIELD] STARTING_INITIALIZATION...');
-        
-        // Timeout dla SecureStore (często się zawiesza w containerach)
-        const storageTask = Promise.all([
-          SecureStore.getItemAsync('vextro_identity_public'),
-          SecureStore.getItemAsync('vextro_identity_private')
-        ]);
-
-        const timeoutTask = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error("STORAGE_TIMEOUT")), 4000)
-        );
-
-        let keys;
-        try {
-          keys = await Promise.race([storageTask, timeoutTask]);
-        } catch (e) {
-          console.warn('⚠️ [SHIELD] SECURE_STORE_TIMEOUT or ERROR. Using volatile identity.');
-          keys = [null, null];
-        }
-
-        let [pubKey, privKey] = keys;
-
-        if (!pubKey || !privKey) {
-          console.log('🛡️ [SHIELD] GENERATING_IDENTITY: Industrial-grade keys...');
-          const keyPair = nacl.box.keyPair();
-          pubKey = Buffer.from(keyPair.publicKey).toString('base64');
-          privKey = Buffer.from(keyPair.secretKey).toString('base64');
-
-          try {
-            await SecureStore.setItemAsync('vextro_identity_public', pubKey);
-            await SecureStore.setItemAsync('vextro_identity_private', privKey, {
-              keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY
-            });
-          } catch (storageErr) {
-            console.error('❌ [SHIELD] SECURE_STORE_WRITE_ERROR:', storageErr.message);
-          }
-        }
-
-        console.log('🛡️ [SHIELD] IDENTITY_READY:', pubKey.substring(0, 10) + '...');
-        setIdentity({ publicKey: pubKey });
-        await loadSessions();
-        setIsReady(true);
-      } catch (criticalErr) {
-        console.error('❌ [SHIELD] CRITICAL_INITIALIZATION_ERROR:', criticalErr.message);
-        // Fail-safe: Nawet jeśli wszystko padnie, pozwólmy na start z pustą tożsamością RAM
-        const backupPair = nacl.box.keyPair();
-        setIdentity({ publicKey: Buffer.from(backupPair.publicKey).toString('base64') });
-        setIsReady(true);
-      }
-    };
-    init();
-  }, []);
 
   // 2. Load Sessions from storage
   const loadSessions = async () => {
@@ -110,6 +54,28 @@ export const ShieldProvider = ({ children }) => {
       console.error('🛡️ [SHIELD] SESSION_SAVE_ERROR:', e);
     }
   };
+
+  // 1. Initialize Identity
+  useEffect(() => {
+    const init = async () => {
+      try {
+        const keys = await SecurityService.initializeKeys();
+        if (keys && keys.publicKey) {
+          setIdentity({ publicKey: keys.publicKey });
+        } else {
+          // Fail-safe: Nawet jeśli wszystko padnie, pozwólmy na start z pustą tożsamością RAM
+          const backupPair = nacl.box.keyPair();
+          setIdentity({ publicKey: Buffer.from(backupPair.publicKey).toString('base64') });
+        }
+      } catch (e) {
+        console.error('❌ [SHIELD] CRITICAL_INITIALIZATION_ERROR:', e.message);
+      } finally {
+        await loadSessions();
+        setIsReady(true);
+      }
+    };
+    init();
+  }, []);
 
   /**
    * Start a new E2EE session with a contact

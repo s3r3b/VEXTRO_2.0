@@ -82,6 +82,21 @@ export class ShieldSession {
       skippedMessageKeys: state.skippedMessageKeys || {}, // { ratchetId_counter: key }
       ...state
     };
+    
+    // 🛡️ VEXTRO MUTEX: Task Queue dla asynchronicznych operacji kryptograficznych
+    this._taskQueue = Promise.resolve();
+  }
+
+  /**
+   * Mutex: Kolejkuje zadania, by wyeliminować Race Conditions
+   */
+  async _enqueue(task) {
+    return new Promise((resolve, reject) => {
+      this._taskQueue = this._taskQueue.then(async () => {
+        try { resolve(await task()); } 
+        catch (e) { reject(e); }
+      });
+    });
   }
 
   /**
@@ -104,62 +119,108 @@ export class ShieldSession {
   }
 
   /**
-   * Encrypt a message and advance sending ratchet
+   * Handles jumping forward in the receiving chain and storing unused keys.
    */
-  async encrypt(plaintext) {
-    const { sendingChain, dhKeyPair, sendingCounter } = this.state;
-    
-    // Derive message key
-    const [nextCk, mk] = await kdfChain(sendingChain);
-    this.state.sendingChain = nextCk;
-    this.state.sendingCounter++;
-
-    // Prepare Encryption
-    const nonce = nacl.randomBytes(24);
-    const ciphertext = nacl.secretbox(
-      Buffer.from(plaintext, 'utf8'),
-      nonce,
-      mk
-    );
-
-    // Return header (DH key + counters) and ciphertext
-    return {
-      header: {
-        dhPublicKey: Buffer.from(dhKeyPair.publicKey).toString('base64'),
-        pn: this.state.previousCounter,
-        n: sendingCounter
-      },
-      ciphertext: Buffer.from(ciphertext).toString('base64'),
-      nonce: Buffer.from(nonce).toString('base64')
-    };
+  async skipMessageKeys(untilCounter) {
+    const MAX_SKIP = 1000;
+    if (this.state.receivingChain != null) {
+      if (untilCounter - this.state.receivingCounter > MAX_SKIP) {
+        throw new Error('🛡️ [SHIELD] Zbyt duża luka w wiadomościach. Przekroczono MAX_SKIP.');
+      }
+      while (this.state.receivingCounter < untilCounter) {
+        const [nextCk, mk] = await kdfChain(this.state.receivingChain);
+        this.state.receivingChain = nextCk;
+        
+        const dhKeyBase64 = Buffer.from(this.state.remoteDhPublicKey).toString('base64');
+        const skipId = `${dhKeyBase64}_${this.state.receivingCounter}`;
+        
+        // Klucz zapisywany jest jako base64 by uniknąć problemów z serializacją (JSON.stringify Uint8Array)
+        this.state.skippedMessageKeys[skipId] = Buffer.from(mk).toString('base64');
+        this.state.receivingCounter++;
+      }
+    }
   }
 
   /**
-   * Decrypt a message and advance receiving ratchet if needed
+   * Encrypt a message (string or Uint8Array) and advance sending ratchet
    */
-  async decrypt(header, ciphertextBase64, nonceBase64) {
-    const ciphertext = Buffer.from(ciphertextBase64, 'base64');
-    const nonce = Buffer.from(nonceBase64, 'base64');
-    const remotePubKey = Buffer.from(header.dhPublicKey, 'base64');
+  async encrypt(data) {
+    return this._enqueue(async () => {
+      const currentN = this.state.sendingCounter;
+      
+      // Derive message key
+      const [nextCk, mk] = await kdfChain(this.state.sendingChain);
+      this.state.sendingChain = nextCk;
+      this.state.sendingCounter++;
 
-    // 1. Check if it's a new DH ratchet
-    const isNewRatchet = !this.state.remoteDhPublicKey || 
-                        Buffer.from(this.state.remoteDhPublicKey).toString('hex') !== Buffer.from(remotePubKey).toString('hex');
+      // Prepare Encryption
+      const nonce = nacl.randomBytes(24);
+      const plaintext = typeof data === 'string' ? Buffer.from(data, 'utf8') : data;
+      
+      const ciphertext = nacl.secretbox(
+        plaintext,
+        nonce,
+        mk
+      );
 
-    if (isNewRatchet) {
-      await this.performDhRatchet(remotePubKey);
-    }
+      // Return header (DH key + counters) and ciphertext
+      return {
+        header: {
+          dhPublicKey: Buffer.from(this.state.dhKeyPair.publicKey).toString('base64'),
+          pn: this.state.previousCounter,
+          n: currentN
+        },
+        ciphertext: Buffer.from(ciphertext).toString('base64'),
+        nonce: Buffer.from(nonce).toString('base64')
+      };
+    });
+  }
 
-    // 2. Derive message key (simplified for this POC - usually handles skipping)
-    const [nextCk, mk] = await kdfChain(this.state.receivingChain);
-    this.state.receivingChain = nextCk;
-    this.state.receivingCounter++;
+  /**
+   * Decrypt a message and advance receiving ratchet if needed.
+   * Returns Uint8Array if asBinary is true, otherwise string (utf8).
+   */
+  async decrypt(header, ciphertextBase64, nonceBase64, asBinary = false) {
+    return this._enqueue(async () => {
+      const ciphertext = Buffer.from(ciphertextBase64, 'base64');
+      const nonce = Buffer.from(nonceBase64, 'base64');
+      const remotePubKey = Buffer.from(header.dhPublicKey, 'base64');
 
-    // 3. Decrypt
-    const decrypted = nacl.secretbox.open(ciphertext, nonce, mk);
-    if (!decrypted) throw new Error('🛡️ [SHIELD] DECRYPTION_FAILED: MAC mismatch.');
+      // 0. Obsługa pominiętych wiadomości (Out-of-Order / Zgubione pakiety)
+      const skipId = `${header.dhPublicKey}_${header.n}`;
+      if (this.state.skippedMessageKeys[skipId]) {
+        console.log(`🛡️ [SHIELD] Odszyfrowano opóźnioną wiadomość (Skipped Key): ${skipId}`);
+        const mk = Buffer.from(this.state.skippedMessageKeys[skipId], 'base64');
+        delete this.state.skippedMessageKeys[skipId];
+        
+        const decrypted = nacl.secretbox.open(ciphertext, nonce, mk);
+        if (!decrypted) throw new Error('🛡️ [SHIELD] DECRYPTION_FAILED: MAC mismatch na starym kluczu.');
+        return asBinary ? decrypted : Buffer.from(decrypted).toString('utf8');
+      }
 
-    return Buffer.from(decrypted).toString('utf8');
+      // 1. Check if it's a new DH ratchet
+      const isNewRatchet = !this.state.remoteDhPublicKey || 
+                          Buffer.from(this.state.remoteDhPublicKey).toString('hex') !== Buffer.from(remotePubKey).toString('hex');
+
+      if (isNewRatchet) {
+        await this.skipMessageKeys(header.pn);
+        await this.performDhRatchet(remotePubKey);
+      }
+
+      // 2. Zrzucamy opóźnione klucze z obecnego łańcucha (jeśli wiadomość dotarła za wcześnie)
+      await this.skipMessageKeys(header.n);
+
+      // 3. Wyprowadzenie klucza wiadomości
+      const [nextCk, mk] = await kdfChain(this.state.receivingChain);
+      this.state.receivingChain = nextCk;
+      this.state.receivingCounter++;
+
+      // 4. Odszyfrowanie
+      const decrypted = nacl.secretbox.open(ciphertext, nonce, mk);
+      if (!decrypted) throw new Error('🛡️ [SHIELD] DECRYPTION_FAILED: MAC mismatch.');
+
+      return asBinary ? decrypted : Buffer.from(decrypted).toString('utf8');
+    });
   }
 
   async performDhRatchet(remotePubKey) {

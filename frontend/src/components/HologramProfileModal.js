@@ -6,9 +6,14 @@ import {
 import { BlurView } from 'expo-blur';
 import { VextroTheme } from '../theme/colors';
 import { 
-  ShieldCheck, User, Users, BellOff, Ban, 
-  Trash2, X, Fingerprint, Info 
-} from 'lucide-react-native';
+  VxProfileIcon, 
+  VxSecurityIcon, 
+  VxNeuralIcon, 
+  VxMuteIcon, 
+  VxBackIcon, 
+  VxInterfaceIcon 
+} from './ui/icons/static';
+import { VxPurgeIcon } from './ui/icons/kinetic';
 import ScaledText from './ScaledText';
 
 const { height } = Dimensions.get('window');
@@ -48,7 +53,7 @@ export default function HologramProfileModal({ visible, onClose, data, onAction,
                 <View style={styles.handle} />
                 
                 <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-                  <X color={VextroTheme.textMuted} size={24} />
+                  <VxBackIcon color={VextroTheme.textMuted} size={24} style={{ transform: [{ rotate: '45deg' }] }} />
                 </TouchableOpacity>
 
                 <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -57,9 +62,9 @@ export default function HologramProfileModal({ visible, onClose, data, onAction,
                     <View style={styles.avatarGlow}>
                       <View style={styles.avatar}>
                         {isGroup ? (
-                          <Users size={40} color={VextroTheme.primary} />
+                          <VxSecurityIcon size={40} color={VextroTheme.primary} />
                         ) : (
-                          <User size={40} color={VextroTheme.primary} />
+                          <VxProfileIcon size={40} color={VextroTheme.primary} />
                         )}
                       </View>
                     </View>
@@ -69,7 +74,7 @@ export default function HologramProfileModal({ visible, onClose, data, onAction,
                     </ScaledText>
                     
                     <View style={styles.badge}>
-                      <ShieldCheck size={12} color={VextroTheme.accent} />
+                      <VxSecurityIcon size={12} color={VextroTheme.accent} />
                       <Text style={styles.badgeText}>ZABEZPIECZONO PROTOKOŁEM SHIELD [E2EE]</Text>
                     </View>
                   </View>
@@ -77,7 +82,7 @@ export default function HologramProfileModal({ visible, onClose, data, onAction,
                   {/* Trust Verification Section */}
                   <View style={styles.section}>
                     <View style={styles.sectionHeader}>
-                      <Fingerprint size={16} color={VextroTheme.primary} />
+                      <VxSecurityIcon size={16} color={VextroTheme.primary} />
                       <Text style={styles.sectionTitle}>WERYFIKACJA TOŻSAMOŚCI</Text>
                     </View>
                     <View style={styles.fingerprintBox}>
@@ -94,7 +99,7 @@ export default function HologramProfileModal({ visible, onClose, data, onAction,
                       style={styles.actionCard} 
                       onPress={() => onAction('TOGGLE_MUTE')}
                     >
-                      <BellOff size={20} color={isMuted ? VextroTheme.primary : VextroTheme.text} />
+                      <VxMuteIcon size={20} color={isMuted ? VextroTheme.primary : VextroTheme.text} />
                       <Text style={[styles.actionLabel, isMuted && {color: VextroTheme.primary}]}>
                         {isMuted ? 'ODWISZ' : 'WYCISZ'}
                       </Text>
@@ -104,7 +109,7 @@ export default function HologramProfileModal({ visible, onClose, data, onAction,
                       style={styles.actionCard} 
                       onPress={() => onAction('TOGGLE_BLOCK')}
                     >
-                      <Ban size={20} color={isBlocked ? "#ff4444" : VextroTheme.text} />
+                      <VxSecurityIcon size={20} color={isBlocked ? "#ff4444" : VextroTheme.text} />
                       <Text style={[styles.actionLabel, isBlocked && {color: "#ff4444"}]}>
                         {isBlocked ? 'ODBLOKUJ' : 'ZABLOKUJ'}
                       </Text>
@@ -114,13 +119,13 @@ export default function HologramProfileModal({ visible, onClose, data, onAction,
                       style={styles.actionCard} 
                       onPress={() => onAction('CLEAR_CHAT')}
                     >
-                      <Trash2 size={20} color="#ff4444" />
+                      <VxPurgeIcon size={20} color="#ff4444" shaking={false} />
                       <Text style={[styles.actionLabel, {color: "#ff4444"}]}>CZYŚĆ</Text>
                     </TouchableOpacity>
                   </View>
 
                   <View style={styles.infoFooter}>
-                     <Info size={14} color={VextroTheme.textMuted} />
+                     <VxInterfaceIcon size={14} color={VextroTheme.textMuted} />
                      <Text style={styles.infoText}>VEXTRO 4.5 Pulse & Shield Engine</Text>
                   </View>
                 </ScrollView>

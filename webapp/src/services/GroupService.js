@@ -7,14 +7,16 @@ const GroupService = {
   async getGroups(userPhone) {
     try {
       const res = await axios.get(
-        `${NetworkConfig.BASE_URL}/api/groups/${encodeURIComponent(userPhone)}`,
-        { timeout: 8000 }
+        `${NetworkConfig.getApiBase()}/groups/${encodeURIComponent(userPhone)}`,
+        { 
+          timeout: 8000
+        }
       );
       const groups = res.data.groups || [];
       localStorage.setItem(CACHE_KEY, JSON.stringify(groups));
       return groups;
     } catch (err) {
-      console.warn('📡 [Groups Web] Sieć niedostępna — ładowanie list z cache');
+      console.warn('📡 [Groups Web] Sieć niedostępna — ładowanie list z cache', err);
       return this.getCachedGroups();
     }
   },

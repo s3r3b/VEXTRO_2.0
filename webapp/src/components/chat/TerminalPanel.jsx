@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { VxGearIcon, VxPurgeIcon, VxSendIcon } from '../ui/icons/kinetic';
-import { VxNeuralIcon } from '../ui/icons/static';
+import { VxGearIcon, VxPurgeIcon, VxSendIcon } from '../../components/ui/icons/kinetic';
+import { VxNeuralIcon } from '../../components/ui/icons/static';
 import { io } from 'socket.io-client';
 import NetworkConfig from '../../services/NetworkConfig';
 

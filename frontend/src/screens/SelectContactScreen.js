@@ -4,9 +4,14 @@ import {
   TextInput, Modal, ActivityIndicator, KeyboardAvoidingView, Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import {
-  Search, X, UserPlus, Users, ChevronRight, Phone, AlertCircle, ArrowLeft
-} from 'lucide-react-native';
+import { 
+  VxProfileIcon, 
+  VxSecurityIcon, 
+  VxRadarIcon, 
+  VxBackIcon, 
+  VxInterfaceIcon 
+} from '../components/ui/icons/static';
+import { VxPurgeIcon } from '../components/ui/icons/kinetic';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -68,7 +73,7 @@ export default function SelectContactScreen({ navigation }) {
     >
       <GlassView intensity={10} style={styles.contactCard}>
         <View style={styles.avatarWrapper}>
-          <Text style={styles.avatarText}>👤</Text>
+          <VxProfileIcon size={30} />
         </View>
         <View style={styles.contactInfo}>
           <ScaledText style={styles.contactName} numberOfLines={1}>
@@ -78,7 +83,7 @@ export default function SelectContactScreen({ navigation }) {
             {item.contactPhone}
           </ScaledText>
         </View>
-        <ChevronRight size={18} color={VextroTheme.surfaceBorder} />
+        <VxBackIcon size={18} color={VextroTheme.surfaceBorder} style={{ transform: [{ rotate: '180deg' }] }} />
       </GlassView>
     </TouchableOpacity>
   );
@@ -89,7 +94,7 @@ export default function SelectContactScreen({ navigation }) {
         onPress={() => navigation.goBack()} 
         style={styles.backBtn}
       >
-        <ArrowLeft color={VextroTheme.text} size={24} />
+        <VxBackIcon color={VextroTheme.text} size={24} />
       </TouchableOpacity>
       <View style={styles.headerTexts}>
         <ScaledText style={styles.headerTitle}>NOWA KOMUNIKACJA</ScaledText>
@@ -107,7 +112,7 @@ export default function SelectContactScreen({ navigation }) {
 
         <View style={styles.searchSection}>
           <GlassView intensity={15} style={styles.searchBar}>
-            <Search size={18} color={VextroTheme.textMuted} style={{ marginRight: 12 }} />
+            <VxRadarIcon size={18} color={VextroTheme.textMuted} style={{ marginRight: 12 }} />
             <TextInput
               placeholder="SZUKAJ..."
               placeholderTextColor={VextroTheme.textMuted}
@@ -118,7 +123,7 @@ export default function SelectContactScreen({ navigation }) {
             />
             {searchQuery.length > 0 && (
               <TouchableOpacity onPress={() => setSearchQuery('')}>
-                <X size={16} color={VextroTheme.textMuted} />
+                <VxBackIcon size={16} color={VextroTheme.textMuted} style={{ transform: [{ rotate: '45deg' }] }} />
               </TouchableOpacity>
             )}
           </GlassView>
@@ -131,7 +136,7 @@ export default function SelectContactScreen({ navigation }) {
             onPress={() => navigation.navigate('CreateGroup')}
           >
             <View style={[styles.actionIconWrapper, { backgroundColor: 'rgba(191,0,255,0.15)' }]}>
-              <Users size={20} color={VextroTheme.primary} />
+              <VxSecurityIcon size={20} color={VextroTheme.primary} />
             </View>
             <Text style={styles.actionText}>NOWA GRUPA</Text>
           </TouchableOpacity>
@@ -142,7 +147,7 @@ export default function SelectContactScreen({ navigation }) {
             onPress={() => setIsModalOpen(true)}
           >
             <View style={[styles.actionIconWrapper, { backgroundColor: 'rgba(0,240,255,0.15)' }]}>
-              <UserPlus size={20} color={VextroTheme.accent} />
+              <VxProfileIcon size={20} color={VextroTheme.accent} />
             </View>
             <Text style={styles.actionText}>NOWY KONTAKT</Text>
           </TouchableOpacity>
@@ -230,16 +235,16 @@ function AddContactModal({ visible, onClose, myPhone, onAdded, navigation }) {
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
-      <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <TouchableOpacity style={StyleSheet.absoluteFill} onPress={handleClose} activeOpacity={1} />
         <GlassView style={styles.modalCard}>
           <View style={styles.modalHeader}>
             <View style={styles.modalTitleRow}>
-              <UserPlus size={20} color={VextroTheme.primary} />
+              <VxProfileIcon size={20} color={VextroTheme.primary} />
               <Text style={styles.modalTitle}>NOWY WĘZEŁ</Text>
             </View>
             <TouchableOpacity onPress={handleClose}>
-              <X size={22} color={VextroTheme.textMuted} />
+              <VxBackIcon size={22} color={VextroTheme.textMuted} style={{ transform: [{ rotate: '45deg' }] }} />
             </TouchableOpacity>
           </View>
 
@@ -248,7 +253,7 @@ function AddContactModal({ visible, onClose, myPhone, onAdded, navigation }) {
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>NUMER TELEFONU</Text>
             <View style={styles.inputRow}>
-              <Phone size={16} color={VextroTheme.primary} style={{ marginRight: 10 }} />
+              <VxInterfaceIcon size={16} color={VextroTheme.primary} style={{ marginRight: 10 }} />
               <TextInput
                 value={phone}
                 onChangeText={setPhone}
@@ -279,7 +284,7 @@ function AddContactModal({ visible, onClose, myPhone, onAdded, navigation }) {
 
           {status === 'error' && (
             <View style={styles.errorBanner}>
-              <AlertCircle size={14} color={VextroTheme.error} />
+              <VxSecurityIcon size={14} color={VextroTheme.error} />
               <Text style={styles.errorText}>{errorMsg}</Text>
             </View>
           )}

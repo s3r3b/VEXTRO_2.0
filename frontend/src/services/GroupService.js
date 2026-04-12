@@ -9,7 +9,9 @@ const GroupService = {
     try {
       const res = await axios.get(
         `${NetworkConfig.BASE_URL}/api/groups/${encodeURIComponent(userPhone)}`,
-        { timeout: 8000 }
+        { 
+          timeout: 8000
+        }
       );
       const groups = res.data.groups || [];
       await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(groups));

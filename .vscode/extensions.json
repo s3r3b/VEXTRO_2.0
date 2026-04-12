@@ -3,6 +3,8 @@
         "dbaeumer.vscode-eslint",
         "bradlc.vscode-tailwindcss",
         "github.vscode-github-actions",
-        "eamodio.gitlens"
+        "eamodio.gitlens",
+        "google.geminicodeassist",
+        "google.gemini-cli-vscode-ide-companion"
     ]
 }

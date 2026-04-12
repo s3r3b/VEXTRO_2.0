@@ -57,7 +57,7 @@ router.post('/add', async (req, res) => {
         displayName: displayName || targetUser.phoneNumber,
         publicKey: targetUser.publicKey,
       },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
+      { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
     );
 
     res.status(201).json({ contact });
@@ -112,7 +112,7 @@ router.patch('/status', async (req, res) => {
     const updated = await Contact.findOneAndUpdate(
       { ownerPhone, contactPhone },
       { $set: updatePayload },
-      { new: true }
+      { returnDocument: 'after' }
     );
     res.json({ success: true, contact: updated });
   } catch (err) {

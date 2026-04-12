@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { VxPurgeIcon } from '../ui/icons/kinetic';
+import { VxPurgeIcon } from '../../components/ui/icons/kinetic';
 import { 
   VxBackIcon, 
   VxSecurityIcon, 
@@ -10,7 +10,7 @@ import {
   VxRadarIcon,
   VxContactCardIcon,
   VxInterfaceIcon
-} from '../ui/icons/static';
+} from '../../components/ui/icons/static';
 
 export default function HologramProfileModal({ isOpen, onClose, data, onAction, isMuted, isBlocked }) {
   if (!data) return null;

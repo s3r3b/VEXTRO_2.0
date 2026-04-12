@@ -6,9 +6,16 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { 
-  User, Shield, Bell, MessageSquare, 
-  RefreshCcw, Bot, Laptop, LogOut, ChevronRight, QrCode, Palette
-} from 'lucide-react-native';
+  VxProfileIcon, 
+  VxSecurityIcon, 
+  VxInterfaceIcon, 
+  VxNeuralIcon, 
+  VxExitIcon, 
+  VxBackIcon,
+  VxShortcutIcon,
+  VxRadarIcon
+} from '../components/ui/icons/static';
+import { VxGearIcon } from '../components/ui/icons/kinetic';
 import * as Haptics from 'expo-haptics';
 
 import { VextroTheme } from '../theme/colors';
@@ -58,13 +65,13 @@ export default function SettingsScreen({ navigation }) {
       activeOpacity={0.7}
     >
       <View style={styles.itemIconContainer}>
-        <Icon size={20} color={color} />
+        {typeof Icon === 'function' ? <Icon size={20} color={color} /> : Icon}
       </View>
       <View style={styles.itemTextContainer}>
         <Text style={styles.itemLabel}>{label}</Text>
         <Text style={styles.itemSub}>{sub}</Text>
       </View>
-      <ChevronRight size={16} color={VextroTheme.surfaceBorder} />
+      <VxBackIcon size={16} color={VextroTheme.surfaceBorder} style={{ transform: [{ rotate: '180deg' }] }} />
     </TouchableOpacity>
   );
 
@@ -85,7 +92,7 @@ export default function SettingsScreen({ navigation }) {
                    <Image source={{ uri: profilePhoto }} style={styles.avatarImg} />
                 ) : (
                    <View style={styles.avatarPlaceholder}>
-                      <User size={30} color={VextroTheme.primary} />
+                      <VxProfileIcon size={30} color={VextroTheme.primary} />
                    </View>
                 )}
                 <View style={styles.onlineBadge} />
@@ -94,7 +101,7 @@ export default function SettingsScreen({ navigation }) {
                 <Text style={styles.nickname}>{nickname}</Text>
                 <Text style={styles.phoneLabel}>{phoneNumber}</Text>
                 <View style={styles.securityBadge}>
-                    <Shield size={10} color={VextroTheme.accent} />
+                    <VxSecurityIcon size={12} color={VextroTheme.accent} />
                     <Text style={styles.securityText}>IDENTITY VERIFIED</Text>
                 </View>
               </View>
@@ -102,7 +109,7 @@ export default function SettingsScreen({ navigation }) {
                 style={styles.qrBtn}
                 onPress={() => navigation.navigate('QRScanner')}
               >
-                <QrCode size={24} color={VextroTheme.primary} />
+                <VxRadarIcon size={24} color={VextroTheme.primary} />
               </TouchableOpacity>
             </TouchableOpacity>
           </GlassView>
@@ -112,7 +119,7 @@ export default function SettingsScreen({ navigation }) {
             <Text style={styles.sectionHeader}>CORE SECURITY</Text>
             <GlassView intensity={10} style={styles.groupCard}>
                 <SettingItem 
-                    icon={Shield} 
+                    icon={VxSecurityIcon} 
                     label="Account Security" 
                     sub="Biometrics, 2FA, session control" 
                     screen="Account"
@@ -120,7 +127,7 @@ export default function SettingsScreen({ navigation }) {
                 />
                 <View style={styles.divider} />
                 <SettingItem 
-                    icon={Shield} 
+                    icon={VxSecurityIcon} 
                     label="Privacy & Encryption" 
                     sub="E2EE protocols, disappearing logs" 
                     screen="Privacy"
@@ -133,17 +140,17 @@ export default function SettingsScreen({ navigation }) {
             <Text style={styles.sectionHeader}>INTERFACE & DATA</Text>
             <GlassView intensity={10} style={styles.groupCard}>
                 <SettingItem 
-                    icon={Palette} 
+                    icon={VxInterfaceIcon} 
                     label="Interface Synthesis" 
                     sub="Typography, wallpapers, terminal physics" 
                     screen="InterfaceSynthesis"
                     color={VextroTheme.primary}
                 />
                 <View style={styles.divider} />
-                <SettingItem icon={Bell} label="Notifications" sub="Neon pulse, priority alerts" />
+                <SettingItem icon={VxInterfaceIcon} label="Notifications" sub="Neon pulse, priority alerts" />
                 <View style={styles.divider} />
                 <SettingItem 
-                    icon={Laptop} 
+                    icon={VxShortcutIcon} 
                     label="Linked Devices" 
                     sub="Active VEXTRO Web sessions" 
                     screen="QRScanner"
@@ -156,20 +163,20 @@ export default function SettingsScreen({ navigation }) {
             <Text style={styles.sectionHeader}>EXPERIMENTAL</Text>
             <GlassView intensity={10} style={styles.groupCard}>
                 <SettingItem 
-                    icon={Bot} 
+                    icon={VxNeuralIcon} 
                     label="VEXTRO AI Integration" 
                     sub="Private LLM endpoint configuration" 
                     screen="AISettings"
                     color={VextroTheme.primary}
                 />
                 <View style={styles.divider} />
-                <SettingItem icon={RefreshCcw} label="System Update" sub="Check for node patches" />
+                <SettingItem icon={VxGearIcon} label="System Update" sub="Check for node patches" />
             </GlassView>
           </View>
 
           {/* LOGOUT */}
           <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-              <LogOut size={18} color={VextroTheme.error} />
+              <VxExitIcon size={18} color={VextroTheme.error} />
               <Text style={styles.logoutText}>TERMINATE SESSION</Text>
           </TouchableOpacity>
 

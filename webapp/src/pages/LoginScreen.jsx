@@ -49,6 +49,11 @@ export default function LoginScreen() {
        setStatus('authorized');
        console.log("🔒 Autoryzacja udana!", data);
        
+       // Zapisz tożsamość zdekodowaną ze skanera by ChatScreen wiedział kim jesteśmy
+       if (data.token || data.userData?.phone) {
+         localStorage.setItem('userPhone', data.userData?.phone || data.token);
+       }
+       
        setTimeout(() => {
          socket.disconnect();
          navigate('/chat');
@@ -129,7 +134,7 @@ export default function LoginScreen() {
       <motion.div 
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.8, ease: "easeOut" }}
+        transition={{ type: "spring", stiffness: 100, damping: 20, mass: 0.8 }}
         className="z-10 w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-12 items-center"
       >
         {/* Left Pane: QR Sync */}
@@ -152,33 +157,6 @@ export default function LoginScreen() {
                 />
                 )}
             </motion.div>
-
-            {/* TUNNEL/HUB OVERRIDE (For Ngrok/LAN Issues) */}
-            <div className="mt-8 w-full max-w-xs">
-                {!showHubConfig ? (
-                    <button 
-                        onClick={() => setShowHubConfig(true)}
-                        className="text-[9px] font-mono text-white/20 hover:text-primary transition-colors tracking-widest uppercase"
-                    >
-                        [ CONFIG_NODE_OVERRIDE ]
-                    </button>
-                ) : (
-                    <div className="bg-white/5 p-4 rounded-xl border border-white/10 space-y-3">
-                        <p className="text-[9px] font-mono text-primary tracking-widest uppercase">TUNNEL_ADDRESS (Ngrok/IP):</p>
-                        <input 
-                            type="text"
-                            value={customHubUrl}
-                            onChange={(e) => setCustomHubUrl(e.target.value)}
-                            placeholder="https://xyz.ngrok-free.app"
-                            className="w-full bg-black/40 border border-white/10 p-2 rounded text-[10px] text-white font-mono outline-none focus:border-primary/40"
-                        />
-                        <div className="flex gap-2">
-                            <button onClick={handleSaveHub} className="flex-1 bg-primary/20 text-primary p-2 rounded text-[9px] font-bold uppercase hover:bg-primary/30 transition-all">SAVE_RELOAD</button>
-                            <button onClick={() => setShowHubConfig(false)} className="flex-1 bg-white/5 text-white/40 p-2 rounded text-[9px] font-bold uppercase hover:bg-white/10">CANCEL</button>
-                        </div>
-                    </div>
-                )}
-            </div>
         </div>
 
         {/* Vertical Divider (Desktop Only) */}

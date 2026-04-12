@@ -1,63 +1,24 @@
 // Ścieżka: /workspaces/VEXTRO/frontend/src/screens/LoginScreen.js
 import React, { useState } from 'react';
-import { 
-  StyleSheet, Text, View, TextInput, TouchableOpacity, 
-  SafeAreaView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform 
+import {
+  StyleSheet, Text, View, TextInput, TouchableOpacity,
+  SafeAreaView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Zap, ShieldCheck, Cpu, Smartphone, Scan } from 'lucide-react-native';
+import {
+  VxNeuralIcon,
+  VxRadarIcon,
+  VxSecurityIcon
+} from '../components/ui/icons/static';
 import { VextroTheme } from '../theme/colors';
 import CyberBackground from '../components/CyberBackground';
 import GlassView from '../components/GlassView';
 import { useShield } from '../context/ShieldContext';
-import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
 import * as Haptics from 'expo-haptics';
 import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
 import NetworkConfig from '../services/NetworkConfig';
 import axios from 'axios';
-
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
-
-async function registerForPushNotificationsAsync() {
-  let token;
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#bf00ff', // VEXTRO primary
-    });
-  }
-
-  if (Device.isDevice) {
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-    if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-    if (finalStatus !== 'granted') {
-      console.log('Failed to get push token for push notification!');
-      return;
-    }
-    token = (await Notifications.getExpoPushTokenAsync({
-      // ID domyślne dla wersji open/standalone
-      projectId: Constants.expoConfig?.extra?.eas?.projectId || 'vextro-mobile-3.0'
-    })).data;
-  } else {
-    console.log('Must use physical device for Push Notifications');
-  }
-
-  return token;
-}
 
 /**
  * VEXTRO 3.0 AUTHENTICATION
@@ -84,7 +45,7 @@ export default function LoginScreen({ navigation }) {
   const handleVerify = async () => {
     try {
       setLoading(true);
-      
+
       // LOGOWANIE AUDYTORE (Tylko dla Seniora)
       console.log('📡 [VEXTRO_AUTH] Próba synchronizacji tożsamości...');
       console.log(`- Phone: ${phoneNumber}`);
@@ -92,12 +53,18 @@ export default function LoginScreen({ navigation }) {
       console.log(`- Shield Ready: ${isReady}`);
       console.log(`- Public Key: ${identity?.publicKey ? 'PRESENT' : 'MISSING'}`);
 
+      const cleanPhone = phoneNumber.replace(/[^\d+]/g, '');
+
       if (!identity?.publicKey) {
-        throw new Error("SHIELD_NOT_READY: Klucz tożsamości nie został jeszcze wygenerowany.");
+        Alert.alert("SECURE BOOT", "Klucze kryptograficzne są jeszcze generowane. Spróbuj ponownie za kilka sekund.");
+        setLoading(false);
+        return;
       }
 
       if (!smsCode || smsCode.length < 4) {
-        throw new Error("INVALID_AUTH_CODE: Kod autoryzacyjny jest wymagany.");
+        Alert.alert("AUTH FAILED", "Wprowadź poprawny 4-cyfrowy kod zabezpieczający.");
+        setLoading(false);
+        return;
       }
 
       // 1. Pobranie adresu Hub
@@ -105,32 +72,22 @@ export default function LoginScreen({ navigation }) {
 
       // 2. Rejestracja/Weryfikacja na Backendzie
       await axios.post(authUrl, {
-        phoneNumber: phoneNumber,
+        phoneNumber: cleanPhone,
         code: smsCode, // Mapowanie pass_8*** na 'code'
         publicKey: identity.publicKey
-      }, { 
-        timeout: 5000,
-        headers: NetworkConfig.getBypassHeaders()
+      }, {
+        timeout: 5000
       });
 
-      await AsyncStorage.setItem('userPhone', phoneNumber);
+      await AsyncStorage.setItem('userPhone', cleanPhone);
       console.log('✅ Identity synchronized with VEXTRO Hub');
-
-      // 3. Rejestracja Cichego Payloadu Notyfikacji PUSH
-      const token = await registerForPushNotificationsAsync();
-      if (token) {
-        await axios.patch(`${NetworkConfig.getSocketUrl()}/api/users/pushtoken`, {
-          phoneNumber: phoneNumber,
-          pushToken: token
-        }, { headers: NetworkConfig.getBypassHeaders() });
-      }
 
       navigation.replace('Main');
     } catch (err) {
       console.error('❌ Błąd krytyczny autoryzacji:', err.response?.data || err.message);
       const debugPath = `${NetworkConfig.getSocketUrl()}/api/auth/verify-code`;
       Alert.alert(
-        "IDENTITY_FAILURE_HUB", 
+        "IDENTITY_FAILURE_HUB",
         `ERROR: ${err.response?.data?.error || err.message}\n\nTarget: ${debugPath}`
       );
     } finally {
@@ -141,23 +98,23 @@ export default function LoginScreen({ navigation }) {
   return (
     <CyberBackground>
       <SafeAreaView style={styles.container}>
-        <KeyboardAvoidingView 
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.flex}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.flex}
         >
           <View style={styles.content}>
             {/* Logo Section */}
             <View style={styles.header}>
               <View style={styles.iconRing}>
-                <Cpu size={32} color={VextroTheme.primary} />
+                <VxNeuralIcon size={32} color={VextroTheme.primary} />
               </View>
               <Text style={styles.logo}>VEXTRO</Text>
-              
-              <TouchableOpacity 
-                 onPress={() => navigation.navigate('QRScanner')}
-                 style={styles.scanBadge}
+
+              <TouchableOpacity
+                onPress={() => navigation.navigate('QRScanner')}
+                style={styles.scanBadge}
               >
-                <Scan size={12} color={VextroTheme.accent} />
+                <VxRadarIcon size={12} color={VextroTheme.accent} />
                 <Text style={styles.scanBadgeText}>TARGET_HUB_DISCOVERY</Text>
               </TouchableOpacity>
 
@@ -171,10 +128,10 @@ export default function LoginScreen({ navigation }) {
               <Text style={styles.label}>
                 {isSmsSent ? "ENTER AUTH CODE (MOCK: 1234)" : "IDENTITY VERIFICATION"}
               </Text>
-              
+
               <View style={styles.inputWrapper}>
-                <TextInput 
-                  style={styles.input} 
+                <TextInput
+                  style={styles.input}
                   placeholder={isSmsSent ? "0000" : "+48 000 000 000"}
                   placeholderTextColor={VextroTheme.textMuted}
                   keyboardType="phone-pad"
@@ -185,8 +142,8 @@ export default function LoginScreen({ navigation }) {
                 />
               </View>
 
-              <TouchableOpacity 
-                style={styles.btn} 
+              <TouchableOpacity
+                style={styles.btn}
                 onPress={isSmsSent ? handleVerify : handleSendSms}
                 activeOpacity={0.8}
               >
@@ -194,7 +151,7 @@ export default function LoginScreen({ navigation }) {
                   <ActivityIndicator color={VextroTheme.background} />
                 ) : (
                   <View style={styles.btnContent}>
-                    <ShieldCheck size={20} color={VextroTheme.background} />
+                    <VxSecurityIcon size={20} color={VextroTheme.background} />
                     <Text style={styles.btnText}>
                       {isSmsSent ? "AUTHORIZE" : "GENERATE ENCRYPTION KEY"}
                     </Text>
@@ -205,12 +162,12 @@ export default function LoginScreen({ navigation }) {
 
             {/* Sync QR Shortcut - Just like on Web */}
             {!isSmsSent && (
-              <TouchableOpacity 
-                style={styles.syncBtn} 
+              <TouchableOpacity
+                style={styles.syncBtn}
                 onPress={() => navigation.navigate('QRScanner')}
                 activeOpacity={0.7}
               >
-                <Scan size={18} color={VextroTheme.accent} />
+                <VxRadarIcon size={18} color={VextroTheme.accent} />
                 <Text style={styles.syncBtnText}>FAST SYNC (QR SCAN)</Text>
               </TouchableOpacity>
             )}
@@ -245,10 +202,10 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     elevation: 5,
   },
-  logo: { 
-    fontSize: 42, 
-    fontWeight: '900', 
-    color: VextroTheme.text, 
+  logo: {
+    fontSize: 42,
+    fontWeight: '900',
+    color: VextroTheme.text,
     letterSpacing: 4,
     textShadowColor: VextroTheme.primaryGlow,
     textShadowOffset: { width: 0, height: 0 },
@@ -292,20 +249,20 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0, 240, 255, 0.1)',
     marginTop: 12,
   },
-  scanBadgeText: { 
-    color: VextroTheme.accent, 
-    fontSize: 8, 
-    fontWeight: '900', 
-    letterSpacing: 2, 
+  scanBadgeText: {
+    color: VextroTheme.accent,
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 2,
     marginLeft: 8,
     textTransform: 'uppercase'
   },
   authBox: { padding: 32, width: '100%' },
-  label: { 
-    color: VextroTheme.textMuted, 
-    fontSize: 10, 
-    fontWeight: '700', 
-    letterSpacing: 2.5, 
+  label: {
+    color: VextroTheme.textMuted,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 2.5,
     textAlign: 'center',
     marginBottom: 24,
     textTransform: 'uppercase',
@@ -315,20 +272,20 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: VextroTheme.surfaceBorder,
   },
-  input: { 
-    width: '100%', 
-    height: 48, 
-    color: VextroTheme.primary, 
-    fontSize: 20, 
+  input: {
+    width: '100%',
+    height: 48,
+    color: VextroTheme.primary,
+    fontSize: 20,
     textAlign: 'center',
     fontWeight: '700',
   },
-  btn: { 
-    width: '100%', 
-    height: 56, 
-    backgroundColor: VextroTheme.primary, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
+  btn: {
+    width: '100%',
+    height: 56,
+    backgroundColor: VextroTheme.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
     borderRadius: 16,
     shadowColor: VextroTheme.primary,
     shadowOffset: { width: 0, height: 4 },
