@@ -1,10 +1,17 @@
 // Ścieżka: /workspaces/VEXTRO/frontend/src/screens/LoginScreen.js
+/**
+ * VEXTRO 3.0 ATOMIC E2EE AUTHENTICATION
+ * Two modes: CREATE ACCOUNT (with X3DH bundle) & LOGIN (existing account)
+ *
+ * Protocol: ATOMIC_E2EE_REGISTRATION_PROTOCOL
+ * Date: 2026-04-13
+ */
+
 import React, { useState } from 'react';
 import {
   StyleSheet, Text, View, TextInput, TouchableOpacity,
   SafeAreaView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   VxNeuralIcon,
   VxRadarIcon,
@@ -16,82 +23,178 @@ import GlassView from '../components/GlassView';
 import { useShield } from '../context/ShieldContext';
 import * as Haptics from 'expo-haptics';
 import * as SecureStore from 'expo-secure-store';
-import Constants from 'expo-constants';
-import NetworkConfig from '../services/NetworkConfig';
 import axios from 'axios';
+import NetworkConfig from '../services/NetworkConfig';
+import cryptoCore from '../utils/cryptoCore';
+import StorageManager from '../utils/StorageManager';
 
-/**
- * VEXTRO 3.0 AUTHENTICATION
- * Transformacja wizualna na standard Premium Sync (1:1 Web Mirror).
- */
 export default function LoginScreen({ navigation }) {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [smsCode, setSmsCode] = useState('');
   const [isSmsSent, setIsSmsSent] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [authMode, setAuthMode] = useState(null); // null | 'register' | 'login'
+  const [errorMessage, setErrorMessage] = useState('');
 
   const { identity, isReady } = useShield();
 
   const handleSendSms = () => {
-    if (phoneNumber.length < 9) return Alert.alert("ERROR", "INVALID PHONE FORMAT");
+    if (phoneNumber.length < 9) {
+      Alert.alert("ERROR", "INVALID PHONE FORMAT");
+      return;
+    }
     setLoading(true);
-    // Symulacja szyfrowanego połączenia
+    // Mock SMS (in production: real SMS service)
     setTimeout(() => {
       setLoading(false);
       setIsSmsSent(true);
+      setErrorMessage('');
     }, 1200);
   };
 
-  const handleVerify = async () => {
+  /**
+   * ATOMIC REGISTRATION FLOW
+   * One HTTP request, one transaction, all keys or nothing
+   */
+  const handleAtomicRegister = async () => {
     try {
       setLoading(true);
+      setErrorMessage('');
 
-      // LOGOWANIE AUDYTORE (Tylko dla Seniora)
-      console.log('📡 [VEXTRO_AUTH] Próba synchronizacji tożsamości...');
-      console.log(`- Phone: ${phoneNumber}`);
-      console.log(`- Code length: ${smsCode.length}`);
-      console.log(`- Shield Ready: ${isReady}`);
-      console.log(`- Public Key: ${identity?.publicKey ? 'PRESENT' : 'MISSING'}`);
+      console.log('🔐 [AUTH] ATOMIC_REGISTRATION_START');
 
+      // 1. Validate inputs
       const cleanPhone = phoneNumber.replace(/[^\d+]/g, '');
-
-      if (!identity?.publicKey) {
-        Alert.alert("SECURE BOOT", "Klucze kryptograficzne są jeszcze generowane. Spróbuj ponownie za kilka sekund.");
+      if (smsCode.length < 4) {
+        Alert.alert("AUTH FAILED", "Invalid verification code");
         setLoading(false);
         return;
       }
 
-      if (!smsCode || smsCode.length < 4) {
-        Alert.alert("AUTH FAILED", "Wprowadź poprawny 4-cyfrowy kod zabezpieczający.");
-        setLoading(false);
-        return;
-      }
+      // 2. ATOMIC: Clear localStorage BEFORE generating new keys
+      console.log('🧹 [AUTH] Clearing previous keys...');
+      await StorageManager.clear();
 
-      // 1. Pobranie adresu Hub
-      const authUrl = `${NetworkConfig.getSocketUrl()}/api/auth/verify-code`;
+      // 3. Generate X3DH bundle (Ed25519 identity + Curve25519 SPK + 50 OTPKs)
+      console.log('🔑 [AUTH] Generating X3DH bundle...');
+      const { bundle, localKeys } = cryptoCore.generateX3DHBundle();
 
-      // 2. Rejestracja/Weryfikacja na Backendzie
-      await axios.post(authUrl, {
+      // 4. ATOMIC POST /api/auth/register with FULL bundle
+      console.log('📡 [AUTH] Sending atomic registration request...');
+      const apiBase = NetworkConfig.getApiBase();
+      const response = await axios.post(`${apiBase}/auth/register`, {
         phoneNumber: cleanPhone,
-        code: smsCode, // Mapowanie pass_8*** na 'code'
-        publicKey: identity.publicKey
+        code: smsCode,
+        publicKey: bundle.identityKey,
+        signedPreKey: bundle.signedPreKey,
+        oneTimePreKeys: bundle.oneTimePreKeys
       }, {
-        timeout: 5000
+        timeout: 10000
       });
 
-      await AsyncStorage.setItem('userPhone', cleanPhone);
-      console.log('✅ Identity synchronized with VEXTRO Hub');
+      console.log('✅ [AUTH] Registration successful, user created with all keys');
 
+      // 5. ONLY on success: persist locally
+      console.log('💾 [AUTH] Persisting keys locally...');
+      await StorageManager.setUserPhone(cleanPhone);
+      await StorageManager.setX3DHKeys(localKeys);
+      await StorageManager.setIdentityPublic(bundle.identityKey);
+
+      // 6. Store private identity key in SecureStore (SENSITIVE)
+      await SecureStore.setItemAsync('vextro_identity_private', localKeys.identityKeyPriv);
+
+      console.log('✅ [AUTH] ATOMIC_REGISTRATION_COMPLETE');
+      setIsSmsSent(false);
+      setSmsCode('');
       navigation.replace('Main');
+
     } catch (err) {
-      console.error('❌ Błąd krytyczny autoryzacji:', err.response?.data || err.message);
-      const debugPath = `${NetworkConfig.getSocketUrl()}/api/auth/verify-code`;
-      Alert.alert(
-        "IDENTITY_FAILURE_HUB",
-        `ERROR: ${err.response?.data?.error || err.message}\n\nTarget: ${debugPath}`
-      );
+      console.error('❌ [AUTH] ATOMIC_REGISTRATION_FAILED:', err.response?.data || err.message);
+
+      // ON ERROR: Atomic cleanup (CRITICAL for preventing partial state)
+      console.log('🧹 [AUTH] ERROR: Cleaning up on registration failure...');
+      await StorageManager.clear();
+
+      const errorMsg = err.response?.data?.error || err.message;
+      if (err.response?.status === 409) {
+        Alert.alert(
+          "PHONE_EXISTS",
+          "This phone number is already registered. Use LOGIN instead."
+        );
+      } else {
+        Alert.alert("REGISTRATION_FAILED", errorMsg);
+      }
+      setErrorMessage(errorMsg);
     } finally {
       setLoading(false);
+    }
+  };
+
+  /**
+   * LOGIN FLOW (existing account)
+   * Only verifies phone + code, retrieves existing keys from localStorage
+   */
+  const handleLogin = async () => {
+    try {
+      setLoading(true);
+      setErrorMessage('');
+
+      console.log('📡 [AUTH] LOGIN_START');
+
+      const cleanPhone = phoneNumber.replace(/[^\d+]/g, '');
+      if (smsCode.length < 4) {
+        Alert.alert("AUTH FAILED", "Invalid verification code");
+        setLoading(false);
+        return;
+      }
+
+      // 1. POST /api/auth/login (no bundle, just verification)
+      const apiBase = NetworkConfig.getApiBase();
+      const response = await axios.post(`${apiBase}/auth/login`, {
+        phoneNumber: cleanPhone,
+        code: smsCode
+      }, {
+        timeout: 10000
+      });
+
+      console.log('✅ [AUTH] Login successful');
+
+      // 2. Verify that we have existing keys (should be in localStorage from previous registration)
+      const existingKeys = await StorageManager.getX3DHKeys();
+      if (!existingKeys) {
+        Alert.alert("ERROR", "No encryption keys found. Please CREATE ACCOUNT first.");
+        return;
+      }
+
+      // 3. Update phone in storage (may have changed)
+      await StorageManager.setUserPhone(cleanPhone);
+
+      console.log('✅ [AUTH] LOGIN_COMPLETE');
+      setIsSmsSent(false);
+      setSmsCode('');
+      navigation.replace('Main');
+
+    } catch (err) {
+      console.error('❌ [AUTH] LOGIN_FAILED:', err.response?.data || err.message);
+
+      const errorMsg = err.response?.data?.error || err.message;
+      if (err.response?.status === 401) {
+        Alert.alert("LOGIN_FAILED", "Invalid phone or verification code.");
+      } else {
+        Alert.alert("LOGIN_FAILED", errorMsg);
+      }
+      setErrorMessage(errorMsg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Choose between register or login
+  const handleVerify = () => {
+    if (authMode === 'register') {
+      handleAtomicRegister();
+    } else if (authMode === 'login') {
+      handleLogin();
     }
   };
 
@@ -124,56 +227,107 @@ export default function LoginScreen({ navigation }) {
               </View>
             </View>
 
-            <GlassView style={styles.authBox}>
-              <Text style={styles.label}>
-                {isSmsSent ? "ENTER AUTH CODE (MOCK: 1234)" : "IDENTITY VERIFICATION"}
-              </Text>
+            {/* Mode Selection (Only if not in auth flow) */}
+            {!isSmsSent && !authMode && (
+              <GlassView style={styles.authBox}>
+                <Text style={styles.label}>SELECT MODE</Text>
 
-              <View style={styles.inputWrapper}>
-                <TextInput
-                  style={styles.input}
-                  placeholder={isSmsSent ? "0000" : "+48 000 000 000"}
-                  placeholderTextColor={VextroTheme.textMuted}
-                  keyboardType="phone-pad"
-                  value={isSmsSent ? smsCode : phoneNumber}
-                  onChangeText={isSmsSent ? setSmsCode : setPhoneNumber}
-                  maxLength={isSmsSent ? 4 : 15}
-                  selectionColor={VextroTheme.primary}
-                />
-              </View>
+                <TouchableOpacity
+                  style={[styles.modeBtn, styles.modeBtnPrimary]}
+                  onPress={() => {
+                    setAuthMode('register');
+                    setPhoneNumber('');
+                    setSmsCode('');
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.modeBtnText}>CREATE ACCOUNT</Text>
+                  <Text style={styles.modeBtnSubtext}>Generate new X3DH keys</Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.btn}
-                onPress={isSmsSent ? handleVerify : handleSendSms}
-                activeOpacity={0.8}
-              >
-                {loading ? (
-                  <ActivityIndicator color={VextroTheme.background} />
-                ) : (
-                  <View style={styles.btnContent}>
-                    <VxSecurityIcon size={20} color={VextroTheme.background} />
-                    <Text style={styles.btnText}>
-                      {isSmsSent ? "AUTHORIZE" : "GENERATE ENCRYPTION KEY"}
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            </GlassView>
+                <TouchableOpacity
+                  style={[styles.modeBtn, styles.modeBtnSecondary]}
+                  onPress={() => {
+                    setAuthMode('login');
+                    setPhoneNumber('');
+                    setSmsCode('');
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.modeBtnText}>EXISTING ACCOUNT</Text>
+                  <Text style={styles.modeBtnSubtext}>Use stored keys</Text>
+                </TouchableOpacity>
+              </GlassView>
+            )}
 
-            {/* Sync QR Shortcut - Just like on Web */}
-            {!isSmsSent && (
-              <TouchableOpacity
-                style={styles.syncBtn}
-                onPress={() => navigation.navigate('QRScanner')}
-                activeOpacity={0.7}
-              >
-                <VxRadarIcon size={18} color={VextroTheme.accent} />
-                <Text style={styles.syncBtnText}>FAST SYNC (QR SCAN)</Text>
-              </TouchableOpacity>
+            {/* Auth Flow (Phone/Code Entry) */}
+            {authMode && (
+              <GlassView style={styles.authBox}>
+                <View style={styles.modeHeader}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setAuthMode(null);
+                      setPhoneNumber('');
+                      setSmsCode('');
+                      setIsSmsSent(false);
+                      setErrorMessage('');
+                    }}
+                    style={styles.backBtn}
+                  >
+                    <Text style={styles.backBtnText}>← BACK</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.modeLabel}>
+                    {authMode === 'register' ? 'CREATE ACCOUNT' : 'LOGIN'}
+                  </Text>
+                </View>
+
+                <Text style={styles.label}>
+                  {isSmsSent ? "ENTER AUTH CODE (MOCK: 1234)" : "PHONE NUMBER"}
+                </Text>
+
+                <View style={styles.inputWrapper}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder={isSmsSent ? "0000" : "+48 000 000 000"}
+                    placeholderTextColor={VextroTheme.textMuted}
+                    keyboardType="phone-pad"
+                    value={isSmsSent ? smsCode : phoneNumber}
+                    onChangeText={isSmsSent ? setSmsCode : setPhoneNumber}
+                    maxLength={isSmsSent ? 4 : 15}
+                    selectionColor={VextroTheme.primary}
+                    editable={!loading}
+                  />
+                </View>
+
+                {errorMessage ? (
+                  <Text style={styles.errorText}>❌ {errorMessage}</Text>
+                ) : null}
+
+                <TouchableOpacity
+                  style={[styles.btn, loading && styles.btnDisabled]}
+                  onPress={isSmsSent ? handleVerify : handleSendSms}
+                  activeOpacity={0.8}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <ActivityIndicator color={VextroTheme.background} />
+                  ) : (
+                    <View style={styles.btnContent}>
+                      <VxSecurityIcon size={20} color={VextroTheme.background} />
+                      <Text style={styles.btnText}>
+                        {isSmsSent
+                          ? (authMode === 'register' ? "REGISTER" : "LOGIN")
+                          : "SEND CODE"
+                        }
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </GlassView>
             )}
 
             <Text style={styles.footer}>
-              END-TO-END ENCRYPTED DECENTRALIZED NETWORK v.3.0
+              ATOMIC E2EE REGISTRATION v3.0
             </Text>
           </View>
         </KeyboardAvoidingView>
@@ -257,7 +411,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     textTransform: 'uppercase'
   },
-  authBox: { padding: 32, width: '100%' },
+  authBox: { padding: 32, width: '100%', marginBottom: 24 },
   label: {
     color: VextroTheme.textMuted,
     fontSize: 10,
@@ -266,6 +420,59 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 24,
     textTransform: 'uppercase',
+  },
+  modeHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 240, 255, 0.1)',
+  },
+  backBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  backBtnText: {
+    color: VextroTheme.accent,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  modeLabel: {
+    flex: 1,
+    textAlign: 'center',
+    color: VextroTheme.primary,
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 2,
+  },
+  modeBtn: {
+    padding: 16,
+    marginBottom: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modeBtnPrimary: {
+    backgroundColor: 'rgba(191, 0, 255, 0.1)',
+    borderColor: 'rgba(191, 0, 255, 0.3)',
+  },
+  modeBtnSecondary: {
+    backgroundColor: 'rgba(0, 240, 255, 0.1)',
+    borderColor: 'rgba(0, 240, 255, 0.3)',
+  },
+  modeBtnText: {
+    color: VextroTheme.primary,
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+  },
+  modeBtnSubtext: {
+    color: VextroTheme.textMuted,
+    fontSize: 9,
+    marginTop: 4,
   },
   inputWrapper: {
     marginBottom: 24,
@@ -281,44 +488,44 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   btn: {
-    width: '100%',
-    height: 56,
+    height: 52,
     backgroundColor: VextroTheme.primary,
+    borderRadius: 12,
+    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 16,
     shadowColor: VextroTheme.primary,
-    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 12,
     elevation: 8,
   },
-  btnContent: { flexDirection: 'row', alignItems: 'center' },
-  btnText: { color: VextroTheme.background, fontWeight: '900', letterSpacing: 2, fontSize: 13, marginLeft: 8 },
-  syncBtn: {
+  btnDisabled: {
+    opacity: 0.6,
+  },
+  btnContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 32,
-    paddingVertical: 12,
-    alignSelf: 'center',
   },
-  syncBtnText: {
-    color: VextroTheme.accent,
-    fontWeight: '800',
-    letterSpacing: 2,
-    fontSize: 11,
-    marginLeft: 10,
+  btnText: {
+    color: VextroTheme.background,
+    fontSize: 16,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+    marginLeft: 12,
+  },
+  errorText: {
+    color: '#ff4444',
+    fontSize: 12,
+    marginBottom: 16,
+    textAlign: 'center',
+    fontWeight: '600',
   },
   footer: {
-    position: 'absolute',
-    bottom: 24,
-    left: 0,
-    right: 0,
-    textAlign: 'center',
     color: VextroTheme.textMuted,
     fontSize: 8,
+    textAlign: 'center',
     letterSpacing: 2,
-    opacity: 0.5,
-  }
+    marginTop: 24,
+    fontWeight: '700',
+  },
 });

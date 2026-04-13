@@ -121,11 +121,13 @@ export default function ChatScreen({ route, navigation }) {
       socket.on('chat_history', async (history) => {
         // Deszyfrowanie historii (jeśli wiadomości są zaszyfrowane)
         const decryptedHistory = await Promise.all(history.map(async (msg) => {
-          if (msg.isEncrypted && sessionKey) {
+          if (msg.isEncrypted && phoneNumber) {
             try {
-              const decrypted = await decryptMessage(msg.content, msg.nonce, sessionKey);
+              // FIX: Use decryptFrom instead of undefined decryptMessage
+              const decrypted = await decryptFrom(phoneNumber, msg.header, msg.content, msg.nonce);
               return { ...msg, content: decrypted };
             } catch (e) {
+              console.error('Message decryption failed:', e);
               return { ...msg, content: '[DECRYPTION ERROR]' };
             }
           }

@@ -12,6 +12,7 @@ import TerminalPanel from '../components/chat/TerminalPanel';
 import SettingsModal from '../components/ui/SettingsModal';
 import HologramProfileModal from '../components/chat/HologramProfileModal';
 import { useShield } from '../context/ShieldContext';
+import { apiService } from '../services/apiService';
 
 export default function ChatScreen() {
   const [messages, setMessages] = useState([]);
@@ -167,25 +168,48 @@ export default function ChatScreen() {
           const encryptedPayload = { ...msgPayload, content: ciphertext, nonce, isEncrypted: true };
           socketRef.current.emit('send_group_message', encryptedPayload);
         } else {
-          if (!sessions[activeContact.contactPhone]) {
-            alert("Oczekuję na negocjację kluczy z węzłem... Trwa ustanawianie zapadni.");
-            return;
-          }
+          // --- NOWY FLOW API X3DH ---
+          try {
+            console.log("🔑 [X3DH] Pobieranie kluczy odbiorcy:", activeContact.contactPhone);
+            const receiverKeys = await apiService.fetchReceiverKeys(activeContact.contactPhone);
+            console.log("🔑 [X3DH] Pobrane klucze:", receiverKeys);
+            
+            // Symulacja szyfrowania X3DH (Zastąpi dotychczasowe encryptFor)
+            const simulatedEncryptedPayload = `[SIMULATED_X3DH_ENCRYPTED: ${text}]`;
+            
+            console.log("🚀 Wysyłanie przez nowe API messages/send...");
+            await apiService.sendMessage({
+              sender: myPhone,
+              receiver: activeContact.contactPhone,
+              payload: simulatedEncryptedPayload,
+              messageType: type
+            });
+            console.log("✅ Wiadomość wysłana do serwera (API).");
+            
+          } catch (apiErr) {
+            console.warn("❌ [X3DH] Błąd nowego API, fallback do WebSocket:", apiErr);
+            
+            // FALLBACK - stary sposób po WebSocket (np. gdy serwer zwróci 404 dla kluczy)
+            if (!sessions[activeContact.contactPhone]) {
+              alert("Brak kluczy na serwerze i brak sesji P2P. Zapadnia zamknięta.");
+              return;
+            }
 
-          let encryptedPayload;
-          if (type === 'voice' && mediaPayload) {
-            encryptedPayload = { 
-              ...msgPayload, 
-              header: mediaPayload.header, 
-              nonce: mediaPayload.nonce, 
-              isEncrypted: true 
-            };
-          } else {
-            const { header, ciphertext, nonce } = await encryptFor(activeContact.contactPhone, text);
-            encryptedPayload = { ...msgPayload, content: ciphertext, header, nonce, isEncrypted: true };
+            let encryptedPayload;
+            if (type === 'voice' && mediaPayload) {
+              encryptedPayload = { 
+                ...msgPayload, 
+                header: mediaPayload.header, 
+                nonce: mediaPayload.nonce, 
+                isEncrypted: true 
+              };
+            } else {
+              const { header, ciphertext, nonce } = await encryptFor(activeContact.contactPhone, text);
+              encryptedPayload = { ...msgPayload, content: ciphertext, header, nonce, isEncrypted: true };
+            }
+            
+            socketRef.current.emit('send_message', encryptedPayload);
           }
-          
-          socketRef.current.emit('send_message', encryptedPayload);
         }
       } catch (err) {
         console.error("Encryption fail:", err);

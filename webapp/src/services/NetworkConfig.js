@@ -2,19 +2,18 @@
 
 /**
  * VEXTRO Webapp Network Configuration
- * Centralny punkt styku z infrastrukturą VEXTRO Hub.
+ * Omijamy Vite Proxy - celujemy bezpośrednio w Node.js (port 5050)
  */
 const NetworkConfig = {
-    // Backend VEXTRO
-    // Dzięki proxy w Vite, '/socket.io' i '/api' są automatycznie 
-    // kierowane na właściwy port (5050 w dev).
     getSocketUrl() {
-        // W deweloperce zwracamy po prostu origin, Vite zajmie się resztą.
-        return window.location.origin;
+        const protocol = window.location.protocol;
+        const hostname = window.location.hostname;
+        // Bezpośredni strzał do backendu VEXTRO
+        return `${protocol}//${hostname}:5050`;
     },
 
     getApiBase() {
-        return '/api';
+        return `${this.getSocketUrl()}/api`;
     }
 };
 

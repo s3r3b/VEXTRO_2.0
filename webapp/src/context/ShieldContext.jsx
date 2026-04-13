@@ -2,7 +2,6 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import nacl from 'tweetnacl';
 import { Buffer } from 'buffer';
 import { ShieldSession } from '../utils/ShieldEngine';
-import SecurityService from '../services/SecurityService';
 
 const ShieldContext = createContext();
 
@@ -42,12 +41,15 @@ export const ShieldProvider = ({ children }) => {
     }
   };
 
-  // 1. Initialize Identity
+  // 1. Initialize Identity from localStorage (set during registration/login)
   useEffect(() => {
     const init = async () => {
-      const keys = SecurityService.initializeKeys();
-      if (keys && keys.publicKey) {
-        setIdentity({ publicKey: keys.publicKey });
+      // X3DH system: publicKey is stored during registration by LoginScreen
+      const publicKey = localStorage.getItem('vextro_identity_public');
+      if (publicKey) {
+        setIdentity({ publicKey });
+      } else {
+        console.warn('🛡️ [SHIELD] No identity found. User not registered on this device.');
       }
       loadSessions();
       setIsReady(true);

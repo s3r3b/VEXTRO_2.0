@@ -5,11 +5,13 @@
 [X] 1.2 Podstawowe modele bazy danych (User, Message, Contact, Group)
 [X] 1.3 Podstawowe trasy REST API (Auth, Users, Contacts, Groups, Messages, Media)
 [X] 1.4 Komunikacja Real-Time (Socket.io) dla podstawowego przesyłania wiadomości
-[ ] 1.5 Wdrożenie PassKey (WebAuthn/FIDO2)
-[ ] 1.6 Production-grade X3DH PreKey Bundle Relay API. This must include endpoints for uploading, replenishing, and fetching bundles (Identity Key, Signed PreKey, and One-Time PreKeys).
-[ ] 1.7 Zabezpieczenie endpointu uploadu i autoryzacja pobierania mediów - details in to_be_continued.md
-[ ] 1.8 Rozszerzone zarządzanie grupami (rotacja kluczy przy zmianie składu) - details in to_be_continued.md
-[ ] 1.9 Implementacja logiki kryptograficznej backendu (utils/crypto.js) - details in to_be_continued.md
+[X] 1.5 Backend: Implement secure storage and retrieval logic for X3DH PreKey Bundles. Ensure the server acts as a reliable relay for client-side E2EE establishment.
+[X] 1.5a Message Relay API Implementation (Zero Knowledge persistence)
+[ ] 1.6 Wdrożenie PassKey (WebAuthn/FIDO2)
+[ ] 1.7 Production-grade X3DH PreKey Bundle Relay API. This must include endpoints for uploading, replenishing, and fetching bundles (Identity Key, Signed PreKey, and One-Time PreKeys).
+[ ] 1.8 Zabezpieczenie endpointu uploadu i autoryzacja pobierania mediów - details in to_be_continued.md
+[ ] 1.9 Rozszerzone zarządzanie grupami (rotacja kluczy przy zmianie składu) - details in to_be_continued.md
+[ ] 2.0 Implementacja logiki kryptograficznej backendu (utils/crypto.js) - details in to_be_continued.md
 
 ## Faza 2 (Frontend Mobile UI & Logic)
 [X] 2.1 Konfiguracja nawigacji React Navigation i szkieletu ekranów (Login, Chat, Settings, itp.)

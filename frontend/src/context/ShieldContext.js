@@ -15,7 +15,7 @@ nacl.setPRNG((x, n) => {
 
 import { Buffer } from 'buffer';
 import { ShieldSession } from '../utils/ShieldEngine';
-import SecurityService from '../services/SecurityService';
+import StorageManager from '../utils/StorageManager';
 
 const ShieldContext = createContext();
 
@@ -25,10 +25,10 @@ export const ShieldProvider = ({ children }) => {
   const [groupKeys, setGroupKeys] = useState({}); // { groupId: UInt8Array (Symmetric Key) }
   const [isReady, setIsReady] = useState(false);
 
-  // 2. Load Sessions from storage
+  // 2. Load Sessions from storage (UPDATED to use StorageManager version key)
   const loadSessions = async () => {
     try {
-      const stored = await AsyncStorage.getItem('vextro_shield_sessions');
+      const stored = await AsyncStorage.getItem('vextro_shield_sessions_v1');
       if (stored) {
         const parsed = JSON.parse(stored);
         const restored = {};
@@ -36,22 +36,55 @@ export const ShieldProvider = ({ children }) => {
           restored[contactId] = new ShieldSession(state);
         }
         setSessions(restored);
+        console.log(`🛡️ [SHIELD] LOADED_${Object.keys(restored).length}_SESSIONS`);
       }
     } catch (e) {
       console.error('🛡️ [SHIELD] SESSION_LOAD_ERROR:', e);
     }
   };
 
-  // 3. Save Sessions to storage
+  // 2B. Load Group Keys from storage (NEW)
+  const loadGroupKeys = async () => {
+    try {
+      const stored = await StorageManager.getGroupKeys();
+      if (stored) {
+        // Restore Uint8Array from base64
+        const restored = {};
+        for (const [groupId, keyBase64] of Object.entries(stored)) {
+          restored[groupId] = Buffer.from(keyBase64, 'base64');
+        }
+        setGroupKeys(restored);
+        console.log(`🛡️ [SHIELD] LOADED_${Object.keys(restored).length}_GROUP_KEYS`);
+      }
+    } catch (e) {
+      console.error('🛡️ [SHIELD] GROUP_KEYS_LOAD_ERROR:', e);
+    }
+  };
+
+  // 3. Save Sessions to storage (UPDATED to use StorageManager version)
   const saveSessions = async (currentSessions) => {
     try {
       const serialized = {};
       for (const [contactId, session] of Object.entries(currentSessions)) {
         serialized[contactId] = session.state;
       }
-      await AsyncStorage.setItem('vextro_shield_sessions', JSON.stringify(serialized));
+      await AsyncStorage.setItem('vextro_shield_sessions_v1', JSON.stringify(serialized));
     } catch (e) {
       console.error('🛡️ [SHIELD] SESSION_SAVE_ERROR:', e);
+    }
+  };
+
+  // 3B. Save Group Keys to storage (NEW)
+  const saveGroupKeys = async (currentGroupKeys) => {
+    try {
+      // Convert Uint8Array to base64 for storage
+      const serialized = {};
+      for (const [groupId, key] of Object.entries(currentGroupKeys)) {
+        serialized[groupId] = Buffer.from(key).toString('base64');
+      }
+      await StorageManager.setGroupKeys(serialized);
+    } catch (e) {
+      console.error('🛡️ [SHIELD] GROUP_KEYS_SAVE_ERROR:', e);
     }
   };
 
@@ -59,18 +92,24 @@ export const ShieldProvider = ({ children }) => {
   useEffect(() => {
     const init = async () => {
       try {
-        const keys = await SecurityService.initializeKeys();
-        if (keys && keys.publicKey) {
-          setIdentity({ publicKey: keys.publicKey });
+        // FIXED: Use StorageManager instead of deleted SecurityService
+        const localKeys = await StorageManager.getX3DHKeys();
+        if (localKeys && localKeys.identityKeyPriv) {
+          // Identity key exists from previous registration
+          const identityPub = await StorageManager.getIdentityPublic();
+          setIdentity({ publicKey: identityPub });
+          console.log('🛡️ [SHIELD] LOADED_EXISTING_IDENTITY');
         } else {
-          // Fail-safe: Nawet jeśli wszystko padnie, pozwólmy na start z pustą tożsamością RAM
+          // New session: Generate temporary identity (will be replaced on registration)
           const backupPair = nacl.box.keyPair();
           setIdentity({ publicKey: Buffer.from(backupPair.publicKey).toString('base64') });
+          console.log('🛡️ [SHIELD] NO_IDENTITY_YET (registration flow)');
         }
       } catch (e) {
         console.error('❌ [SHIELD] CRITICAL_INITIALIZATION_ERROR:', e.message);
       } finally {
         await loadSessions();
+        await loadGroupKeys();
         setIsReady(true);
       }
     };
@@ -140,12 +179,13 @@ export const ShieldProvider = ({ children }) => {
 
   /**
    * [GROUP] Setup a group channel from the envelope received from the backend
+   * UPDATED: Persist group keys to storage
    */
   const setupGroupSession = async (groupId, encryptedKeyRaw, nonceRaw, adminPublicKeyRaw) => {
     const myPrivKeyRaw = await SecureStore.getItemAsync('vextro_identity_private');
     const myPrivKey = Buffer.from(myPrivKeyRaw, 'base64');
     const adminPubKey = Buffer.from(adminPublicKeyRaw, 'base64');
-    
+
     // Odszyfrowywanie "koperty" asymetrycznej
     const decryptedKey = nacl.box.open(
       Buffer.from(encryptedKeyRaw, 'base64'),
@@ -155,8 +195,11 @@ export const ShieldProvider = ({ children }) => {
     );
 
     if (!decryptedKey) throw new Error("🛡️ [SHIELD] Pudełko klucza grupowego naruszone!");
-    
-    setGroupKeys(prev => ({ ...prev, [groupId]: decryptedKey }));
+
+    const updated = { ...groupKeys, [groupId]: decryptedKey };
+    setGroupKeys(updated);
+    await saveGroupKeys(updated); // PERSIST immediately
+    console.log(`🛡️ [SHIELD] GROUP_SESSION_SETUP: ${groupId}`);
   };
 
   /**

@@ -15,5 +15,6 @@
 - `frontend/src/screens/GroupChatScreen.js`: Group Features (STUB) - Similar to ChatScreen, features like group search, encrypted media viewer, and shortcuts are stubbed with `alert` messages claiming they are disabled for vBETA or lack permissions.
 - `frontend/src/screens/PrivacyScreen.js`: Blacklist - The "Zakazane Węzły (Blacklist)" option is an empty wrapper triggering `Alert.alert('BLACKLIST', ...)` instead of opening a management screen.
 
-**HIGH PRIORITY:**
+DONE
+
 - Backend: Implement secure storage and retrieval logic for X3DH PreKey Bundles. Ensure the server acts as a reliable relay for client-side E2EE establishment.

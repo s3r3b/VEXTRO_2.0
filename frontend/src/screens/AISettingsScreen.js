@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, LayoutAnimation, Platform, UIManager, ScrollView, SafeAreaView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { VxAiSwitch } from '../components/ui/icons/kinetic';
 import { VextroTheme } from '../theme/colors';
 import CyberBackground from '../components/CyberBackground';
@@ -19,11 +20,12 @@ export default function AISettingsScreen({ navigation }) {
   const [nickname, setNickname] = useState('');
   const [showDetails, setShowDetails] = useState(false);
 
-  // Load saved settings
+  // Load saved settings (SECURITY FIX: API key from SecureStore)
   useEffect(() => {
     const loadSettings = async () => {
       const storedEnabled = await AsyncStorage.getItem('ai_enabled');
-      const storedKey = await AsyncStorage.getItem('ai_api_key');
+      // SECURITY FIX: Load API key from SecureStore instead of AsyncStorage
+      const storedKey = await SecureStore.getItemAsync('vextro_ai_api_key');
       const storedNick = await AsyncStorage.getItem('ai_nick');
       if (storedEnabled !== null) {
         const isEnabled = storedEnabled === 'true';
@@ -45,7 +47,8 @@ export default function AISettingsScreen({ navigation }) {
 
   const saveApiKey = async (key) => {
     setApiKey(key);
-    await AsyncStorage.setItem('ai_api_key', key);
+    // SECURITY FIX: Store API key in SecureStore (device-native encryption)
+    await SecureStore.setItemAsync('vextro_ai_api_key', key);
   };
 
   const saveNickname = async (nick) => {

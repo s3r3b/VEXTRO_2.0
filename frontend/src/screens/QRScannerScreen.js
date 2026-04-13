@@ -66,6 +66,27 @@ export default function QRScannerScreen({ navigation }) {
 
       if (!serverUrl || !sessionId) throw new Error("INVALID_PAYLOAD");
 
+      // SECURITY FIX: Validate URL (prevent phishing)
+      try {
+        const url = new URL(serverUrl);
+        const hostname = url.hostname;
+
+        // Only allow private network addresses (localhost, 127.0.0.1, 192.168.x.x, 10.x.x.x)
+        const isPrivateNetwork = /^(localhost|127\.0\.0\.1|192\.168|10\.|172\.1[6-9]\.|172\.2[0-9]\.|172\.3[0-1]\.)/i.test(hostname);
+
+        if (!isPrivateNetwork) {
+          throw new Error(`Invalid server URL: ${hostname} is not a private network address`);
+        }
+      } catch (e) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        Alert.alert(
+          "SECURITY WARNING",
+          `Invalid QR code: ${e.message}\n\nOnly local network servers (localhost, 192.168.x.x, etc.) are allowed.`
+        );
+        setScanned(false);
+        return;
+      }
+
       setIsAuthorizing(true);
       // Pobieramy dane zalogowanego urządzenia (bazy)
       const userPhone = await AsyncStorage.getItem('userPhone') || 'VEXTRO_USER_SYNC';
