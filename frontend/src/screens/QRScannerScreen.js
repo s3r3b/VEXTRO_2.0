@@ -1,13 +1,20 @@
 // Ścieżka: /workspaces/VEXTRO/frontend/src/screens/QRScannerScreen.js
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, Dimensions, StatusBar } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, Dimensions, StatusBar, Alert, ActivityIndicator } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { Zap, X, ShieldAlert, Cpu, ScanLine } from 'lucide-react-native';
+import { 
+  VxSecurityIcon, 
+  VxBackIcon, 
+  VxNeuralIcon, 
+  VxRadarIcon 
+} from '../components/ui/icons/static';
 import * as Haptics from 'expo-haptics';
 import { VextroTheme } from '../theme/colors';
 import CyberBackground from '../components/CyberBackground';
 import GlassView from '../components/GlassView';
 import NetworkConfig from '../services/NetworkConfig';
+import io from 'socket.io-client';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width, height } = Dimensions.get('window');
 
@@ -20,38 +27,103 @@ export default function QRScannerScreen({ navigation }) {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [flash, setFlash] = useState(false);
+  const [isAuthorizing, setIsAuthorizing] = useState(false);
 
   useEffect(() => {
     if (!permission) requestPermission();
   }, []);
 
-  const handleBarCodeScanned = ({ data }) => {
-    if (scanned) return;
+  const handleBarCodeScanned = async ({ data }) => {
+    if (scanned || isAuthorizing) return;
     setScanned(true);
     
     // Haptyka premium - sukces namierzenia celu
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     try {
-      // Format: vextro://auth?token=...&server=...
-      if (data.startsWith('vextro://auth')) {
-        const urlParams = new URLSearchParams(data.split('?')[1]);
-        const serverUrl = urlParams.get('server');
-        const token = urlParams.get('token');
+      let serverUrl = null;
+      let sessionId = null;
 
-        if (serverUrl) {
-            NetworkConfig.setDynamicUrl(serverUrl);
-            // Wygenerowano handshake – powrót do logowania z nowym adresem
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            navigation.goBack(); 
-         }
+      // Elastyczne parsowanie: wspieramy format URL oraz czysty JSON
+      if (data.startsWith('vextro://auth')) {
+        const query = data.split('?')[1];
+        if (query) {
+          const params = query.split('&').reduce((acc, pair) => {
+            const [key, value] = pair.split('=');
+            if (key) acc[key] = decodeURIComponent(value || '');
+            return acc;
+          }, {});
+          serverUrl = params.server;
+          sessionId = params.sessionId || params.token;
+        }
       } else {
-        throw new Error("INVALID_NODE_ADDRESS");
+        try {
+          const parsed = JSON.parse(data);
+          serverUrl = parsed.serverUrl || parsed.server;
+          sessionId = parsed.sessionId || parsed.token;
+        } catch(e) {}
       }
+
+      if (!serverUrl || !sessionId) throw new Error("INVALID_PAYLOAD");
+
+      // SECURITY FIX: Validate URL (prevent phishing)
+      try {
+        const url = new URL(serverUrl);
+        const hostname = url.hostname;
+
+        // Only allow private network addresses (localhost, 127.0.0.1, 192.168.x.x, 10.x.x.x)
+        const isPrivateNetwork = /^(localhost|127\.0\.0\.1|192\.168|10\.|172\.1[6-9]\.|172\.2[0-9]\.|172\.3[0-1]\.)/i.test(hostname);
+
+        if (!isPrivateNetwork) {
+          throw new Error(`Invalid server URL: ${hostname} is not a private network address`);
+        }
+      } catch (e) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        Alert.alert(
+          "SECURITY WARNING",
+          `Invalid QR code: ${e.message}\n\nOnly local network servers (localhost, 192.168.x.x, etc.) are allowed.`
+        );
+        setScanned(false);
+        return;
+      }
+
+      setIsAuthorizing(true);
+      // Pobieramy dane zalogowanego urządzenia (bazy)
+      const userPhone = await AsyncStorage.getItem('userPhone') || 'VEXTRO_USER_SYNC';
+
+      // Zestawiamy tymczasowe połączenie z Hubem, który wystawił QR
+      const tempSocket = io(serverUrl, { transports: ['websocket'], forceNew: true });
+
+      tempSocket.on('connect', () => {
+        console.log(`📡 [SCANNER] Połączono z Hubem. Wysyłam autoryzację dla: ${sessionId}`);
+        tempSocket.emit('authorize_web_session', {
+          sessionId: sessionId,
+          userToken: userPhone,
+          userData: { phone: userPhone }
+        });
+
+        // Hub przy sukcesie po prostu wpuszcza sesję Web, więc zamykamy skaner z małym opóźnieniem
+        setTimeout(() => {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          tempSocket.disconnect();
+          setIsAuthorizing(false);
+          navigation.goBack();
+        }, 1500);
+      });
+
+      tempSocket.on('auth_error', (err) => {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        Alert.alert("SYNC FAILED", err.error || "Nie udało się zautoryzować sesji.");
+        tempSocket.disconnect();
+        setIsAuthorizing(false);
+        setScanned(false);
+      });
+
     } catch (e) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert("LINK ERROR", "UNABLE TO IDENTIFY COMPATIBLE VEXTRO NODE.");
       setScanned(false);
+      setIsAuthorizing(false);
     }
   };
 
@@ -60,7 +132,7 @@ export default function QRScannerScreen({ navigation }) {
     return (
       <CyberBackground>
         <View style={styles.center}>
-          <ShieldAlert size={64} color={VextroTheme.error} />
+          <VxSecurityIcon size={64} color={VextroTheme.error} />
           <Text style={styles.permText}>CAMERA ACCESS REQUIRED FOR ENCRYPTION SYNC</Text>
           <TouchableOpacity onPress={requestPermission} style={styles.permBtn}>
             <Text style={styles.permBtnText}>AUTHORIZE ACCESS</Text>
@@ -82,18 +154,29 @@ export default function QRScannerScreen({ navigation }) {
         }}
       />
 
+      {/* Kinetyczny wskaźnik autoryzacji sesji */}
+      {isAuthorizing && (
+        <View style={styles.authorizingOverlay}>
+          <GlassView intensity={80} style={styles.authorizingBox}>
+            <ActivityIndicator size="large" color={VextroTheme.accent} />
+            <Text style={styles.authorizingText}>AUTHORIZING...</Text>
+            <Text style={styles.authorizingSubtext}>ESTABLISHING SECURE HANDSHAKE</Text>
+          </GlassView>
+        </View>
+      )}
+
       {/* Scoping HUD Overlay */}
       <View style={styles.overlay}>
         <View style={styles.header}>
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.closeBtn}>
-                <X color="#fff" size={24} />
+                <VxBackIcon color="#fff" size={24} />
             </TouchableOpacity>
             <View style={styles.statusBox}>
-                <Cpu size={12} color={VextroTheme.accent} />
+                <VxNeuralIcon size={12} color={VextroTheme.accent} />
                 <Text style={styles.statusText}>HUB DISCOVERY MODE</Text>
             </View>
             <TouchableOpacity onPress={() => setFlash(!flash)} style={styles.closeBtn}>
-                <Zap color={flash ? VextroTheme.accent : "#fff"} size={24} />
+                <VxNeuralIcon color={flash ? VextroTheme.accent : "#fff"} size={24} />
             </TouchableOpacity>
         </View>
 
@@ -105,7 +188,7 @@ export default function QRScannerScreen({ navigation }) {
             
             <View style={styles.scannerLine} />
             <View style={styles.targetCenter}>
-                <ScanLine size={32} color="rgba(0, 240, 255, 0.3)" />
+                <VxRadarIcon size={32} color="rgba(0, 240, 255, 0.3)" />
             </View>
         </View>
 
@@ -226,5 +309,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     borderRadius: 12,
   },
-  permBtnText: { color: '#000', fontWeight: '900', fontSize: 13, letterSpacing: 1 }
+  permBtnText: { color: '#000', fontWeight: '900', fontSize: 13, letterSpacing: 1 },
+  authorizingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    zIndex: 999,
+  },
+  authorizingBox: {
+    padding: 40,
+    borderRadius: 24,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 240, 255, 0.3)',
+  },
+  authorizingText: {
+    color: VextroTheme.accent,
+    marginTop: 24,
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 3,
+  },
+  authorizingSubtext: {
+    color: VextroTheme.textMuted,
+    marginTop: 8,
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+  }
 });

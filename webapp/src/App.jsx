@@ -4,13 +4,12 @@ import { AnimatePresence } from 'framer-motion';
 import SplashScreen from './pages/SplashScreen';
 import LoginScreen from './pages/LoginScreen';
 import ChatScreen from './pages/ChatScreen';
-import { ThemeProvider } from './context/ThemeContext';
+import { ThemeProvider } from './context/ThemeContext.jsx';
 
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
 
   return (
-    <ThemeProvider>
     <Router>
       <div className="relative w-full h-[100dvh] overflow-hidden bg-background font-sans text-textMain selection:bg-primary/30">
         
@@ -30,6 +29,5 @@ export default function App() {
         )}
       </div>
     </Router>
-    </ThemeProvider>
   );
 }

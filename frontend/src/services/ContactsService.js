@@ -15,7 +15,9 @@ const ContactsService = {
     try {
       const res = await axios.get(
         `${NetworkConfig.BASE_URL}/api/contacts/${encodeURIComponent(ownerPhone)}`,
-        { timeout: 8000 }
+        { 
+          timeout: 8000
+        }
       );
       const contacts = res.data.contacts || [];
 
@@ -50,7 +52,9 @@ const ContactsService = {
       const res = await axios.post(
         `${NetworkConfig.BASE_URL}/api/contacts/add`,
         { ownerPhone, contactPhone, displayName },
-        { timeout: 10000 }
+        { 
+          timeout: 10000
+        }
       );
       // Unieważnij cache — wymusi fresh fetch przy następnym renderze
       await AsyncStorage.removeItem(CACHE_KEY);

@@ -3,7 +3,15 @@ import {
   StyleSheet, View, Text, TextInput, ScrollView, 
   TouchableOpacity, SafeAreaView, KeyboardAvoidingView, Platform 
 } from 'react-native';
-import { Terminal as TerminalIcon, X, Send, Trash2, Cpu } from 'lucide-react-native';
+import { 
+  VxNeuralIcon, 
+  VxBackIcon, 
+  VxInterfaceIcon 
+} from '../components/ui/icons/static';
+import { 
+  VxPurgeIcon, 
+  VxSendIcon 
+} from '../components/ui/icons/kinetic';
 import { VextroTheme } from '../theme/colors';
 import CyberBackground from '../components/CyberBackground';
 import GlassView from '../components/GlassView';
@@ -60,22 +68,21 @@ export default function TerminalScreen({ navigation }) {
   return (
     <CyberBackground>
       <SafeAreaView style={styles.container}>
-        <KeyboardAvoidingView 
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={{ flex: 1 }}
-        >
-          {/* Header */}
+        >          {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerTitleContainer}>
-              <Cpu color={VextroTheme.primary} size={18} />
+              <VxNeuralIcon color={VextroTheme.primary} size={18} />
               <Text style={styles.headerTitle}>GOD_MODE_TERMINAL</Text>
             </View>
             <View style={styles.headerActions}>
                <TouchableOpacity onPress={clearTerminal} style={styles.iconBtn}>
-                <Trash2 color={VextroTheme.textMuted} size={20} />
+                <VxPurgeIcon color={VextroTheme.textMuted} size={20} shaking={false} />
               </TouchableOpacity>
               <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
-                <X color={VextroTheme.text} size={24} />
+                <VxBackIcon color={VextroTheme.text} size={24} style={{ transform: [{ rotate: '45deg' }] }} />
               </TouchableOpacity>
             </View>
           </View>
@@ -118,7 +125,7 @@ export default function TerminalScreen({ navigation }) {
               selectionColor={VextroTheme.primary}
             />
             <TouchableOpacity onPress={handleSend} style={styles.sendBtn}>
-              <Send color={VextroTheme.primary} size={20} />
+              <VxSendIcon color={VextroTheme.primary} size={20} />
             </TouchableOpacity>
           </View>
 

@@ -1,12 +1,56 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { VxVaultHandle } from '../ui/icons/kinetic';
-import { VxSecurityIcon, VxMediaIcon, VxNeuralIcon, VxAvatarIcon } from '../ui/icons/static';
+import { VxVaultHandle } from '../../components/ui/icons/kinetic';
+import { VxSecurityIcon, VxMediaIcon, VxNeuralIcon, VxAvatarIcon } from '../../components/ui/icons/static';
 import GlassMenuModal from './GlassMenuModal';
+import { useShield } from '../../context/ShieldContext';
+import axios from 'axios';
+import NetworkConfig from '../../services/NetworkConfig';
 
 export default function ChatCanvas({ messages, myPhone, activeContact, onMenuAction, isMuted, isBlocked, isGhost, onToggleTerminal }) {
   const scrollContainerRef = useRef(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { decryptFrom } = useShield();
+
+  const [playingId, setPlayingId] = useState(null);
+  const [audioUrls, setAudioUrls] = useState({}); // { msgId: blobUrl }
+
+  const handlePlayVoice = async (msg) => {
+    if (playingId === msg.id) {
+      setPlayingId(null);
+      return;
+    }
+
+    try {
+      let audioUrl = audioUrls[msg.id];
+
+      if (!audioUrl) {
+        console.log(`🛡️ [SHIELD] Web JIT Decryption: ${msg.id}`);
+        // 1. Pobierz zaszyfrowany plik
+        const res = await axios.get(`${NetworkConfig.getSocketUrl()}${msg.mediaUrl}`, {
+          responseType: 'arraybuffer'
+        });
+
+        // 2. Deszyfrowanie binarne
+        const encryptedData = new Uint8Array(res.data);
+        const decryptedData = await decryptFrom(activeContact.contactPhone, msg.header, encryptedData, msg.nonce, true);
+
+        // 3. Stwórz Blob URL dla przeglądarki
+        const blob = new Blob([decryptedData], { type: 'audio/webm' }); // WebApp używa WebM
+        audioUrl = URL.createObjectURL(blob);
+        setAudioUrls(prev => ({ ...prev, [msg.id]: audioUrl }));
+      }
+
+      const audio = new Audio(audioUrl);
+      audio.play();
+      setPlayingId(msg.id);
+      audio.onended = () => setPlayingId(null);
+
+    } catch (err) {
+      console.error("🛡️ [SHIELD] Web Playback Error:", err);
+      alert("Błąd deszyfrowania notatki głosowej.");
+    }
+  };
 
   // Wymuszenie precyzyjnego poślizgu tylko dla wewnętrznego kontenera
   useEffect(() => {
@@ -93,15 +137,20 @@ export default function ChatCanvas({ messages, myPhone, activeContact, onMenuAct
                 
                 {msg.type === 'voice' ? (
                   <div className="flex items-center gap-4 py-2 min-w-[240px]">
-                    <button className={`p-3 rounded-full ${isMine ? 'bg-primary/20 text-primary' : 'bg-white/10 text-textMuted'} hover:scale-110 transition-transform`}>
+                    <button 
+                      onClick={() => handlePlayVoice(msg)}
+                      className={`p-3 rounded-full ${playingId === msg.id ? 'bg-accent/20 text-accent animate-pulse shadow-neon-accent/40' : (isMine ? 'bg-primary/20 text-primary' : 'bg-white/10 text-textMuted')} hover:scale-110 transition-all`}
+                    >
                       <VxMediaIcon size={20} />
                     </button>
                     <div className="flex-1 flex flex-col gap-2">
                       <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden relative">
-                        <div className={`absolute left-0 top-0 bottom-0 w-1/3 ${isMine ? 'bg-primary shadow-neon-primary' : 'bg-accent shadow-neon-accent'}`}></div>
+                        <div className={`absolute left-0 top-0 bottom-0 ${playingId === msg.id ? 'w-full transition-all duration-[2000ms] linear bg-accent shadow-neon-accent' : (isMine ? 'w-1/3 bg-primary shadow-neon-primary' : 'w-1/3 bg-white/20')}`}></div>
                       </div>
                       <div className="flex justify-between items-center px-1">
-                        <span className="text-[9px] font-mono text-textMuted uppercase">SHIELDED_AUDIO.BIN</span>
+                        <span className="text-[9px] font-mono text-textMuted uppercase tracking-widest">
+                          {playingId === msg.id ? 'DECRYPTING & PLAYING' : 'SECURE_VOICE.BIN'}
+                        </span>
                         <span className="text-[9px] font-mono text-white/50">{msg.duration || 0}s</span>
                       </div>
                     </div>

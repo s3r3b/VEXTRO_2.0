@@ -6,9 +6,12 @@ import {
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { 
-  Type, MessageSquare, 
-  ShieldAlert, ChevronLeft, Zap, Palette
-} from 'lucide-react-native';
+  VxBackIcon, 
+  VxNeuralIcon, 
+  VxShortcutIcon, 
+  VxInterfaceIcon, 
+  VxSecurityIcon 
+} from '../components/ui/icons/static';
 import * as Haptics from 'expo-haptics';
 
 import { useUI } from '../context/UIContext';
@@ -123,7 +126,7 @@ export default function InterfaceSynthesisScreen({ navigation }) {
         {/* HEADER */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <ChevronLeft size={24} color={VextroTheme.text} />
+            <VxBackIcon size={24} color={VextroTheme.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>INTERFACE SYNTHESIS</Text>
           <View style={{ width: 44 }} />
@@ -133,7 +136,7 @@ export default function InterfaceSynthesisScreen({ navigation }) {
           
           {/* PREVIEW CARD */}
           <GlassView style={styles.previewCard}>
-            <Zap size={16} color={VextroTheme.primary} style={{ marginBottom: 8 }} />
+            <VxNeuralIcon size={16} color={VextroTheme.primary} style={{ marginBottom: 8 }} />
             <ScaledText style={styles.previewLabel}>REAL-TIME PREVIEW</ScaledText>
             <ScaledText style={styles.previewText}>
               System typografii VEXTRO reaguje natychmiast na zmiany gęstości informacji.
@@ -143,7 +146,7 @@ export default function InterfaceSynthesisScreen({ navigation }) {
           {/* TYPOGRAPHY SECTION */}
           <View style={styles.section}>
             <View style={styles.sectionLabelRow}>
-              <Type size={14} color={VextroTheme.accent} />
+              <VxShortcutIcon size={14} color={VextroTheme.accent} />
               <Text style={styles.sectionHeader}>TYPOGRAPHY SCALING</Text>
             </View>
             <GlassView intensity={10} style={styles.controlCard}>
@@ -172,7 +175,7 @@ export default function InterfaceSynthesisScreen({ navigation }) {
           {/* WALLPAPER SECTION */}
           <View style={styles.section}>
             <View style={styles.sectionLabelRow}>
-              <Palette size={14} color={VextroTheme.accent} />
+              <VxInterfaceIcon size={14} color={VextroTheme.accent} />
               <Text style={styles.sectionHeader}>AESTHETIC ENVIRONMENT</Text>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.themeScroll}>
@@ -185,7 +188,7 @@ export default function InterfaceSynthesisScreen({ navigation }) {
           {/* CHAT PREFERENCES */}
           <View style={styles.section}>
             <View style={styles.sectionLabelRow}>
-              <MessageSquare size={14} color={VextroTheme.accent} />
+              <VxInterfaceIcon size={14} color={VextroTheme.accent} />
               <Text style={styles.sectionHeader}>CHAT PROTOCOLS</Text>
             </View>
             <GlassView intensity={10} style={styles.groupCard}>
@@ -206,7 +209,7 @@ export default function InterfaceSynthesisScreen({ navigation }) {
                 <View>
                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={styles.toggleLabel}>Anti-Voice Protection</Text>
-                      <ShieldAlert size={10} color={VextroTheme.error} style={{ marginLeft: 6 }} />
+                      <VxSecurityIcon size={10} color={VextroTheme.error} style={{ marginLeft: 6 }} />
                    </View>
                    <Text style={styles.toggleSub}>Hardware-level audio obfuscation</Text>
                 </View>

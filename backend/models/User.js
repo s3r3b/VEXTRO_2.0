@@ -23,7 +23,7 @@ const UserSchema = new mongoose.Schema({
   oneTimePreKeys: [
     {
       key: { type: String },
-      id: { type: Number }
+      id: { type: String }  // Changed from Number to String (format: opk-TIMESTAMP-INDEX)
     }
   ],
   displayName: {

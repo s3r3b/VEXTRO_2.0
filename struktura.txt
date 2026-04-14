@@ -1,0 +1,211 @@
+/workspaces/VEXTRO
+|-- .agents
+|   `-- rules
+|       `-- klaudiusz-senior-software-engineer.md
+|-- .devcontainer
+|   |-- Dockerfile
+|   `-- devcontainer.json
+|-- .gitignore
+|-- .vscode
+|   `-- extensions.json
+|-- backend
+|   |-- .env
+|   |-- config
+|   |-- controllers
+|   |-- crypto.js
+|   |-- models
+|   |   |-- Contact.js
+|   |   |-- Group.js
+|   |   |-- Message.js
+|   |   `-- User.js
+|   |-- package-lock.json
+|   |-- package.json
+|   |-- routes
+|   |   |-- auth.js
+|   |   |-- contacts.js
+|   |   |-- groups.js
+|   |   |-- media.js
+|   |   |-- messages.js
+|   |   `-- users.js
+|   |-- server.js
+|   |-- uploads
+|   |   |-- file-1775643598062-852097917.m4a
+|   |   |-- file-1775643606928-156737048.m4a
+|   |   |-- file-1775643616565-283926397.m4a
+|   |   |-- file-1775643626615-249481054.m4a
+|   |   `-- file-1775643629390-63745453.m4a
+|   `-- utils
+|       |-- SessionStore.js
+|       `-- crypto.js
+|-- eas.json
+|-- frontend
+|   |-- .expo
+|   |   |-- README.md
+|   |   |-- devices.json
+|   |   `-- settings.json
+|   |-- .gitignore
+|   |-- .npmrc
+|   |-- App.js
+|   |-- app.json
+|   |-- assets
+|   |   |-- android-icon-background.png
+|   |   |-- android-icon-foreground.png
+|   |   |-- android-icon-monochrome.png
+|   |   |-- favicon.png
+|   |   |-- icon.png
+|   |   `-- splash-icon.png
+|   |-- babel.config.js
+|   |-- eas.json
+|   |-- index.js
+|   |-- package-lock.json
+|   |-- package.json
+|   `-- src
+|       |-- components
+|       |   |-- CyberBackground.js
+|       |   |-- CyberButton.js
+|       |   |-- EmojiPicker.js
+|       |   |-- GlassMenuModal.js
+|       |   |-- GlassView.js
+|       |   |-- HologramProfileModal.js
+|       |   |-- NewChatModal.js
+|       |   |-- ScaledText.js
+|       |   |-- StatusIndicator.js
+|       |   `-- ui
+|       |       `-- icons
+|       |           |-- kinetic
+|       |           |   |-- VxAiSwitch.js
+|       |           |   |-- VxGearIcon.js
+|       |           |   |-- VxGhostGate.js
+|       |           |   |-- VxMicIcon.js
+|       |           |   |-- VxPurgeIcon.js
+|       |           |   |-- VxSendIcon.js
+|       |           |   |-- VxVaultHandle.js
+|       |           |   `-- index.js
+|       |           `-- static
+|       |               |-- VxAvatarIcon.js
+|       |               |-- VxBackIcon.js
+|       |               |-- VxContactCardIcon.js
+|       |               |-- VxExitIcon.js
+|       |               |-- VxInterfaceIcon.js
+|       |               |-- VxMediaIcon.js
+|       |               |-- VxMoreIcon.js
+|       |               |-- VxMuteIcon.js
+|       |               |-- VxNeuralIcon.js
+|       |               |-- VxProfileIcon.js
+|       |               |-- VxRadarIcon.js
+|       |               |-- VxSecurityIcon.js
+|       |               |-- VxShortcutIcon.js
+|       |               `-- index.js
+|       |-- context
+|       |   |-- ShieldContext.js
+|       |   `-- UIContext.js
+|       |-- screens
+|       |   |-- AISettingsScreen.js
+|       |   |-- AccountScreen.js
+|       |   |-- ChatScreen.js
+|       |   |-- ContactsScreen.js
+|       |   |-- CreateGroupScreen.js
+|       |   |-- GroupChatScreen.js
+|       |   |-- InterfaceSynthesisScreen.js
+|       |   |-- LoginScreen.js
+|       |   |-- PrivacyScreen.js
+|       |   |-- ProfileEditScreen.js
+|       |   |-- QRScannerScreen.js
+|       |   |-- SelectContactScreen.js
+|       |   |-- SettingsScreen.js
+|       |   `-- TerminalScreen.js
+|       |-- services
+|       |   |-- ContactsService.js
+|       |   |-- GroupService.js
+|       |   |-- NetworkConfig.js
+|       |   `-- SecurityService.js
+|       |-- theme
+|       |   |-- colors.js
+|       |   `-- wallpapers.js
+|       `-- utils
+|           |-- HmacSha256.js
+|           |-- ShieldEngine.js
+|           `-- formatters.js
+|-- package-lock.json
+|-- package.json
+|-- scripts
+|   `-- dev-tunnel.sh
+|-- technologie.md
+`-- webapp
+    |-- .gitignore
+    |-- README.md
+    |-- eslint.config.js
+    |-- index.html
+    |-- package-lock.json
+    |-- package.json
+    |-- postcss.config.js
+    |-- public
+    |   |-- favicon.svg
+    |   `-- icons.svg
+    |-- src
+    |   |-- App.jsx
+    |   |-- components
+    |   |   |-- chat
+    |   |   |   |-- ChatCanvas.jsx
+    |   |   |   |-- ContactSidebar.jsx
+    |   |   |   |-- GlassMenuModal.jsx
+    |   |   |   |-- HologramProfileModal.jsx
+    |   |   |   |-- MessageInput.jsx
+    |   |   |   `-- TerminalPanel.jsx
+    |   |   |-- effects
+    |   |   |   `-- GlitchLogo.jsx
+    |   |   |-- layout
+    |   |   |   `-- DashboardLayout.jsx
+    |   |   `-- ui
+    |   |       |-- PhoneAuthPanel.jsx
+    |   |       |-- QrPanel.jsx
+    |   |       |-- SettingsModal.jsx
+    |   |       `-- icons
+    |   |           |-- kinetic
+    |   |           |   |-- VxAiSwitch.jsx
+    |   |           |   |-- VxGearIcon.jsx
+    |   |           |   |-- VxGhostGate.jsx
+    |   |           |   |-- VxMicIcon.jsx
+    |   |           |   |-- VxPurgeIcon.jsx
+    |   |           |   |-- VxSendIcon.jsx
+    |   |           |   |-- VxVaultHandle.jsx
+    |   |           |   `-- index.js
+    |   |           `-- static
+    |   |               |-- VxAvatarIcon.jsx
+    |   |               |-- VxBackIcon.jsx
+    |   |               |-- VxContactCardIcon.jsx
+    |   |               |-- VxExitIcon.jsx
+    |   |               |-- VxInterfaceIcon.jsx
+    |   |               |-- VxMediaIcon.jsx
+    |   |               |-- VxMoreIcon.jsx
+    |   |               |-- VxMuteIcon.jsx
+    |   |               |-- VxNeuralIcon.jsx
+    |   |               |-- VxProfileIcon.jsx
+    |   |               |-- VxRadarIcon.jsx
+    |   |               |-- VxSecurityIcon.jsx
+    |   |               |-- VxShortcutIcon.jsx
+    |   |               `-- index.js
+    |   |-- context
+    |   |   |-- ShieldContext.jsx
+    |   |   `-- ThemeContext.jsx
+    |   |-- hooks
+    |   |-- index.css
+    |   |-- main.jsx
+    |   |-- pages
+    |   |   |-- ChatScreen.jsx
+    |   |   |-- LoginScreen.jsx
+    |   |   `-- SplashScreen.jsx
+    |   |-- services
+    |   |   |-- ContactsService.js
+    |   |   |-- GroupService.js
+    |   |   |-- NetworkConfig.js
+    |   |   `-- SecurityService.js
+    |   |-- theme
+    |   |   `-- themes.js
+    |   `-- utils
+    |       |-- HmacSha256.js
+    |       `-- ShieldEngine.js
+    |-- tailwind.config.js
+    `-- vite.config.js
+
+43 directories, 165 files

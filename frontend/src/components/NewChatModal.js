@@ -15,7 +15,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import CyberButton from './CyberButton';
 
-const SERVER_URL = 'https://vextro-backend-1774716748.loca.lt';
+
 
 export default function NewChatModal({ visible, onClose, onContactSelect }) {
   const [searchQuery, setSearchQuery] = useState('');

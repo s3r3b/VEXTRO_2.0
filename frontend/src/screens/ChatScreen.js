@@ -5,15 +5,24 @@ import {
   KeyboardAvoidingView, Platform, Animated, TouchableOpacity,
   StatusBar, Keyboard
 } from 'react-native';
-import { 
-  ChevronLeft, ShieldCheck, MapPin, Smile, SendHorizonal, 
-  MoreHorizontal, Lock, Zap, Mic, MicOff, Type, Volume2, Play, Pause 
-} from 'lucide-react-native';
+import {
+  VxBackIcon,
+  VxSecurityIcon,
+  VxMoreIcon,
+  VxNeuralIcon,
+  VxProfileIcon,
+  VxShortcutIcon,
+  VxMediaIcon,
+  VxInterfaceIcon
+} from '../components/ui/icons/static';
+import {
+  VxMicIcon,
+  VxSendIcon,
+  VxVaultHandle
+} from '../components/ui/icons/kinetic';
 import io from 'socket.io-client';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
@@ -31,6 +40,7 @@ import GlassMenuModal from '../components/GlassMenuModal';
 import HologramProfileModal from '../components/HologramProfileModal';
 import nacl from 'tweetnacl';
 import { Buffer } from 'buffer';
+import { LinearGradient } from 'expo-linear-gradient';
 
 /**
  * VEXTRO 4.5 PREMIUM CHAT (SHIELD ENABLED)
@@ -49,14 +59,14 @@ export default function ChatScreen({ route, navigation }) {
   const [showEmoji, setShowEmoji] = useState(false);
   const [isMenuVisible, setMenuVisible] = useState(false);
   const [isProfileVisible, setProfileVisible] = useState(false);
-  
+
   // ─── ANTI VOICE STATES ──────────────────────────────────────────────────
   const [isRecording, setIsRecording] = useState(false);
   const [recording, setRecording] = useState(null);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [showAntiVoiceMenu, setShowAntiVoiceMenu] = useState(false);
   const recordingInterval = React.useRef(null);
-  
+
   const [isGhostMode, setIsGhostMode] = useState(false);
   const [isMuted, setIsMuted] = useState(initialIsMuted || false);
   const [isBlocked, setIsBlocked] = useState(initialIsBlocked || false);
@@ -87,17 +97,20 @@ export default function ChatScreen({ route, navigation }) {
       };
       initShield();
     }
+  }, [remotePublicKey, isAI, phoneNumber, sessions, startSession]);
 
+  useEffect(() => {
     AsyncStorage.getItem('userPhone').then(phone => {
       if (phone) setMyPhone(phone);
     });
+  }, []);
 
-    if (!isAI) {
+  useEffect(() => {
+    if (!isAI && myPhone) {
       const roomId = [myPhone, phoneNumber].sort().join('-');
 
       const socket = io(NetworkConfig.getSocketUrl(), {
-        transports: ['websocket'],
-        extraHeaders: NetworkConfig.getBypassHeaders()
+        transports: ['websocket']
       });
       socketRef.current = socket;
 
@@ -108,11 +121,13 @@ export default function ChatScreen({ route, navigation }) {
       socket.on('chat_history', async (history) => {
         // Deszyfrowanie historii (jeśli wiadomości są zaszyfrowane)
         const decryptedHistory = await Promise.all(history.map(async (msg) => {
-          if (msg.isEncrypted && sessionKey) {
+          if (msg.isEncrypted && phoneNumber) {
             try {
-              const decrypted = await decryptMessage(msg.content, msg.nonce, sessionKey);
+              // FIX: Use decryptFrom instead of undefined decryptMessage
+              const decrypted = await decryptFrom(phoneNumber, msg.header, msg.content, msg.nonce);
               return { ...msg, content: decrypted };
             } catch (e) {
+              console.error('Message decryption failed:', e);
               return { ...msg, content: '[DECRYPTION ERROR]' };
             }
           }
@@ -129,26 +144,32 @@ export default function ChatScreen({ route, navigation }) {
 
         if (data.isEncrypted && !isAI) {
           try {
-             const decrypted = await decryptFrom(phoneNumber, data.header, data.content, data.nonce);
-             setMessages(prev => [...prev, { ...data, content: decrypted, id: Date.now().toString(), status: 'delivered' }]);
+            // Dla wiadomości tekstowych deszyfrujemy natychmiast
+            if (data.type !== 'voice') {
+              const decrypted = await decryptFrom(phoneNumber, data.header, data.content, data.nonce);
+              setMessages(prev => [{ ...data, content: decrypted, id: Date.now().toString(), status: 'delivered' }, ...prev]);
+            } else {
+              // Dla głosówek: zostawiamy zaszyfrowany placeholder, deszyfrowanie przy Play
+              setMessages(prev => [{ ...data, content: 'Notatka głosowa (E2EE)', id: Date.now().toString(), status: 'delivered' }, ...prev]);
+            }
           } catch (e) {
-             console.error('🛡️ [SHIELD] Decryption Failed', e);
-             setMessages(prev => [...prev, { ...data, content: '[DECRYPTION ERROR]', id: Date.now().toString() }]);
+            console.error('🛡️ [SHIELD] Decryption Failed', e);
+            setMessages(prev => [{ ...data, content: '[DECRYPTION ERROR]', id: Date.now().toString() }, ...prev]);
           }
         } else {
-           setMessages(prev => [...prev, { ...data, id: Date.now().toString(), status: 'delivered' }]);
+          setMessages(prev => [{ ...data, id: Date.now().toString(), status: 'delivered' }, ...prev]);
         }
       });
 
       return () => socket.disconnect();
     }
-  }, [sessionKey]);
+  }, [myPhone, isAI, phoneNumber, sessionKey, decryptFrom]);
 
   const sendMessage = useCallback(async () => {
     if (!inputText.trim()) return;
     if (isBlocked) {
-       alert("Nie możesz wysłać wiadomości cyfrowej do zablokowanego węzła.");
-       return;
+      alert("Nie możesz wysłać wiadomości cyfrowej do zablokowanego węzła.");
+      return;
     }
 
     const text = inputText.trim();
@@ -158,31 +179,46 @@ export default function ChatScreen({ route, navigation }) {
       const userMsg = { id: Date.now().toString(), sender: myPhone, content: text, timestamp: new Date(), status: 'sent' };
       setMessages(prev => [...prev, userMsg]);
       setIsTyping(true);
-      // AI Logic remains
+      
+      setTimeout(() => {
+        setIsTyping(false);
+        setMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          sender: 'AI',
+          content: 'VEXTRO NEURAL_NET odebrało dane. Moduł w budowie.',
+          timestamp: new Date(),
+          isAI: true
+        }]);
+      }, 1000);
     } else {
       const roomId = [myPhone, phoneNumber].sort().join('-');
       let msgPayload = { sender: myPhone, roomId, content: text, timestamp: new Date() };
-      
-      // 2. Double Ratchet Encryption
-      if (!isAI && sessions[phoneNumber]) {
-        try {
-          const { header, ciphertext, nonce } = await encryptFor(phoneNumber, text);
-          msgPayload = { 
-            ...msgPayload, 
-            header,
-            content: ciphertext, 
-            nonce: nonce,
-            isEncrypted: true 
-          };
-        } catch (e) {
-          console.error('🛡️ [SHIELD] Encryption Failed', e);
-        }
+
+      // 2. Double Ratchet Encryption (ENFORCED)
+      if (!sessions[phoneNumber]) {
+        alert("Oczekuję na negocjację kluczy z węzłem... Trwa ustanawianie zapadni.");
+        return; // Przerwij wysyłanie jawnego tekstu
       }
 
-      socketRef.current?.emit('send_message', msgPayload);
-      setMessages(prev => [...prev, { ...msgPayload, content: text, id: Date.now().toString(), status: 'sent' }]);
+      try {
+        const { header, ciphertext, nonce } = await encryptFor(phoneNumber, text);
+        const encryptedPayload = {
+          ...msgPayload,
+          header,
+          content: ciphertext,
+          nonce: nonce,
+          isEncrypted: true
+        };
+        socketRef.current?.emit('send_message', encryptedPayload);
+      } catch (e) {
+        console.error('🛡️ [SHIELD] Encryption Failed', e);
+        alert("Błąd kryptograficzny. Wiadomość NIE została wysłana.");
+        return; // Przerwij wysyłanie jawnego tekstu
+      }
+
+      setMessages(prev => [...prev, { ...msgPayload, id: Date.now().toString(), status: 'sent' }]);
     }
-  }, [inputText, isAI, myPhone, phoneNumber, sessionKey, sessions, encryptFor, isBlocked]);
+  }, [inputText, isAI, myPhone, phoneNumber, sessions, encryptFor, isBlocked]);
 
   // ─── ANTI VOICE METHODS ──────────────────────────────────────────────────
   const startRecording = async () => {
@@ -209,85 +245,141 @@ export default function ChatScreen({ route, navigation }) {
     }
   };
 
-  const stopRecording = async (mode = 'voice') => {
+  const stopRecording = async () => {
     setIsRecording(false);
     clearInterval(recordingInterval.current);
     if (!recording) return;
 
-    await recording.stopAndUnloadAsync();
-    const uri = recording.getURI();
-    setRecording(null);
-
-    if (mode === 'text') {
-      await handleTranscription(uri);
-    } else {
-      await handleVoiceSend(uri);
-    }
-  };
-
-  const handleTranscription = async (uri) => {
     try {
-      const formData = new FormData();
-      formData.append('file', {
-        uri,
-        name: 'voice.m4a',
-        type: 'audio/m4a',
-      });
-
-      const res = await axios.post(`${NetworkConfig.getSocketUrl()}/api/media/transcribe`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      
-      if (res.data.text) {
-        setInputText(res.data.text);
-        // Automatyczne wysłanie tekstu po transkrypcji? 
-        // Tak, bo to "Anti Voice" - jedna akcja.
-      }
+      await recording.stopAndUnloadAsync();
+      const uri = recording.getURI();
+      setRecording(null);
+      await handleVoiceSend(uri);
     } catch (e) {
-      console.error("Transkrypcja błąd:", e);
+      console.error('🛡️ [SHIELD] Błąd czyszczenia mikrofonu:', e);
+      setRecording(null);
     }
   };
 
   const handleVoiceSend = async (uri) => {
-    // SZYFROWANIE E2EE AUDIO (Shield Logic)
-    // W tej wersji: szyfrujemy nagranie i wysyłamy jako plik głosowy.
-    // Prawdziwe szyfrowanie binarne wymagałoby konwersji URI -> Base64 -> Encrypt -> Blob.
+    if (!sessions[phoneNumber]) {
+      alert("Zapadnia zamknięta. Nie można wysłać notatki głosowej bez autoryzacji E2EE.");
+      return;
+    }
+
     try {
-       const formData = new FormData();
-       formData.append('file', {
-         uri,
-         name: 'encrypted_voice.m4a',
-         type: 'audio/m4a',
-       });
+      // 1. Odczyt audio i konwersja na format binarny
+      const base64Audio = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+      const audioData = Buffer.from(base64Audio, 'base64');
 
-       const uploadRes = await axios.post(`${NetworkConfig.getSocketUrl()}/api/media/upload`, formData, {
-         headers: { 'Content-Type': 'multipart/form-data' }
-       });
+      // 2. Szyfrowanie binarne ShieldEngine
+      const { header, ciphertext, nonce } = await encryptFor(phoneNumber, audioData);
 
-       if (uploadRes.data.url) {
-          const msgPayload = {
-            id: Date.now().toString(),
-            sender: myPhone,
-            content: "VOICE_MESSAGE_SHIELD", // Placeholder dla tekstu
-            type: 'voice',
-            mediaUrl: uploadRes.data.url,
-            duration: recordingDuration,
-            timestamp: new Date()
-          };
-          
-          socket.emit('send_message', {
-            ...msgPayload,
-            roomId: [myPhone, phoneNumber].sort().join('-')
-          });
-          setMessages(prev => [msgPayload, ...prev]);
-       }
+      // 3. Przygotowanie zaszyfrowanego Bloba do wysyłki
+      // Zapisujemy ciphertext (Base64) do pliku, aby multer mógł go odebrać
+      const encryptedUri = `${FileSystem.cacheDirectory}encrypted_voice_${Date.now()}.bin`;
+      await FileSystem.writeAsStringAsync(encryptedUri, ciphertext, { encoding: FileSystem.EncodingType.Base64 });
+
+      const formData = new FormData();
+      formData.append('file', {
+        uri: encryptedUri,
+        name: 'shield_voice.bin',
+        type: 'application/octet-stream',
+      });
+
+      const uploadRes = await axios.post(`${NetworkConfig.getSocketUrl()}/api/media/upload`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      if (uploadRes.data.url) {
+        const msgPayload = {
+          id: Date.now().toString(),
+          sender: myPhone,
+          content: "[VOICE_PAYLOAD]", // Placeholder, faktyczne dane są w ciphertext
+          header,
+          nonce,
+          isEncrypted: true,
+          type: 'voice',
+          mediaUrl: uploadRes.data.url,
+          duration: recordingDuration,
+          timestamp: new Date()
+        };
+
+        socketRef.current?.emit('send_message', {
+          ...msgPayload,
+          roomId: [myPhone, phoneNumber].sort().join('-')
+        });
+        
+        // Lokalnie dodajemy do listy by widzieć własną głosówkę
+        setMessages(prev => [{...msgPayload, content: "Notatka głosowa (E2EE)"}, ...prev]);
+      }
     } catch (e) {
-       console.error("Voice Upload Error:", e);
+      console.error("🛡️ [SHIELD] Voice Encryption/Upload Error:", e);
+      alert("Błąd zabezpieczania notatki głosowej.");
+    }
+  };
+
+  const [playingId, setPlayingId] = useState(null);
+  const soundRef = useRef(null);
+
+  const playVoiceMessage = async (item) => {
+    try {
+      if (playingId === item.id) {
+        await soundRef.current?.stopAsync();
+        setPlayingId(null);
+        return;
+      }
+
+      // 1. Sprawdź czy mamy już sound załadowany (jeśli tak, zwolnij go)
+      if (soundRef.current) {
+        await soundRef.current.unloadAsync();
+      }
+
+      setPlayingId(item.id);
+
+      // 2. JIT Decryption: Pobierz i deszyfruj tylko gdy potrzebne
+      const downloadUri = `${FileSystem.cacheDirectory}encrypted_${item.id}.bin`;
+      const decryptedUri = `${FileSystem.cacheDirectory}decrypted_${item.id}.m4a`;
+
+      // Sprawdzamy czy już deszyfrowaliśmy to nagranie wcześniej (prosty cache)
+      const info = await FileSystem.getInfoAsync(decryptedUri);
+      if (!info.exists) {
+        console.log(`🛡️ [SHIELD] JIT Decryption: Pobieranie i deszyfrowanie ${item.id}...`);
+        await FileSystem.downloadAsync(`${NetworkConfig.getSocketUrl()}${item.mediaUrl}`, downloadUri);
+        
+        const encryptedBase64 = await FileSystem.readAsStringAsync(downloadUri, { encoding: FileSystem.EncodingType.Base64 });
+        
+        // Deszyfrowanie binarne
+        const decryptedData = await decryptFrom(phoneNumber, item.header, encryptedBase64, item.nonce, true);
+        
+        // Zapis do m4a
+        const decryptedBase64 = Buffer.from(decryptedData).toString('base64');
+        await FileSystem.writeAsStringAsync(decryptedUri, decryptedBase64, { encoding: FileSystem.EncodingType.Base64 });
+      }
+
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: decryptedUri },
+        { shouldPlay: true }
+      );
+      soundRef.current = sound;
+      
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.didJustFinish) {
+          setPlayingId(null);
+        }
+      });
+
+    } catch (e) {
+      console.error('🛡️ [SHIELD] Playback Error:', e);
+      alert("Błąd odtwarzania bezpiecznej notatki.");
+      setPlayingId(null);
     }
   };
 
   const handleMenuAction = async (actionKey) => {
-    switch(actionKey) {
+    switch (actionKey) {
       case 'VIEW_CONTACT':
         setProfileVisible(true);
         break;
@@ -306,7 +398,7 @@ export default function ChatScreen({ route, navigation }) {
             isMuted: newStatus
           });
           setIsMuted(newStatus);
-        } catch(e) {}
+        } catch (e) { }
         break;
       case 'TOGGLE_GHOST':
         setIsGhostMode(prev => !prev);
@@ -320,14 +412,14 @@ export default function ChatScreen({ route, navigation }) {
             isBlocked: newStatus
           });
           setIsBlocked(newStatus);
-        } catch(e) {}
+        } catch (e) { }
         break;
       case 'CLEAR_CHAT':
         try {
-           const roomId = [myPhone, phoneNumber].sort().join('-');
-           await axios.delete(`${NetworkConfig.BASE_URL}/api/messages/${roomId}`);
-           setMessages([]); // Wyczyść na ekranie natychmiast
-        } catch (e) {}
+          const roomId = [myPhone, phoneNumber].sort().join('-');
+          await axios.delete(`${NetworkConfig.BASE_URL}/api/messages/${roomId}`);
+          setMessages([]); // Wyczyść na ekranie natychmiast, ALE PO WYKONANIU DELETE
+        } catch (e) { }
         break;
       case 'ADD_SHORTCUT':
         alert('Skróty ekranowe wymagają natywnych uprawnień powłoki systemowej OS.');
@@ -337,12 +429,12 @@ export default function ChatScreen({ route, navigation }) {
 
   // Zabezpieczenie przed opuszczeniem w Ghost Mode
   useEffect(() => {
-     return () => {
-        if (isGhostMode) {
-           console.log("👻 Przechwycono zamknięcie w profilu Ghost. Czyszczę cache wiadomości.");
-           // opcjonalnie usuniecie history po stronie cache
-        }
-     }
+    return () => {
+      if (isGhostMode) {
+        console.log("👻 Przechwycono zamknięcie w profilu Ghost. Czyszczę cache wiadomości.");
+        // opcjonalnie usuniecie history po stronie cache
+      }
+    }
   }, [isGhostMode]);
 
   // Render bąbelka wiadomości 3.0 (Glass Concept)
@@ -354,27 +446,34 @@ export default function ChatScreen({ route, navigation }) {
       <View style={[styles.msgContainer, isMine ? styles.myContainer : styles.otherContainer]}>
         <View style={[styles.bubble, isMine ? styles.myBubble : styles.otherBubble]}>
           {isMine && (
-             <LinearGradient
-                colors={[VextroTheme.primary, VextroTheme.secondary]}
-                style={StyleSheet.absoluteFill}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-             />
+            <LinearGradient
+              colors={[VextroTheme.primary, VextroTheme.secondary]}
+              style={StyleSheet.absoluteFill}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            />
           )}
           {!isMine && (
-             <GlassView intensity={10} style={StyleSheet.absoluteFill} />
+            <GlassView intensity={10} style={StyleSheet.absoluteFill} />
           )}
-          
+
           {isVoice ? (
-             <View style={styles.voiceRow}>
-                <TouchableOpacity style={styles.playBtn}>
-                  <Play size={16} color={isMine ? VextroTheme.background : VextroTheme.primary} fill={isMine ? VextroTheme.background : VextroTheme.primary} />
-                </TouchableOpacity>
-                <View style={styles.wavePlaceholder} />
-                <Text style={[styles.duration, {color: isMine ? 'rgba(0,0,0,0.5)' : VextroTheme.textMuted}]}>
-                  {item.duration}s
-                </Text>
-             </View>
+            <View style={styles.voiceRow}>
+              <TouchableOpacity 
+                style={[styles.playBtn, playingId === item.id && { backgroundColor: 'rgba(255,255,255,0.2)' }]}
+                onPress={() => playVoiceMessage(item)}
+              >
+                {playingId === item.id ? (
+                  <VxInterfaceIcon size={16} color={VextroTheme.accent} />
+                ) : (
+                  <VxInterfaceIcon size={16} color={isMine ? VextroTheme.background : VextroTheme.primary} />
+                )}
+              </TouchableOpacity>
+              <View style={[styles.wavePlaceholder, playingId === item.id && { backgroundColor: VextroTheme.accent, opacity: 0.5 }]} />
+              <Text style={[styles.duration, { color: isMine ? 'rgba(0,0,0,0.5)' : VextroTheme.textMuted }]}>
+                {playingId === item.id ? "PLAYING" : `${item.duration}s`}
+              </Text>
+            </View>
           ) : (
             <ScaledText style={[styles.msgText, !isMine && { color: VextroTheme.text }]}>{item.content}</ScaledText>
           )}
@@ -392,118 +491,107 @@ export default function ChatScreen({ route, navigation }) {
     <CyberBackground>
       <StatusBar barStyle="light-content" />
       <SafeAreaView style={styles.safe}>
-        
+
         {/* VEXTRO 3.0 Header */}
         <GlassView intensity={30} style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBtn}>
-            <ChevronLeft color={VextroTheme.primary} size={28} />
+            <VxBackIcon color={VextroTheme.primary} size={28} />
           </TouchableOpacity>
           <View style={styles.headerAvatar}>
-            <Text style={styles.avatarEmoji}>{isAI ? '🤖' : '👤'}</Text>
+            {isAI ? <VxNeuralIcon size={24} /> : <VxProfileIcon size={24} />}
           </View>
           <View style={styles.headerInfo}>
             <Text style={styles.headerTitle} numberOfLines={1}>{title}</Text>
             <View style={styles.headerStatusRow}>
-               <ShieldCheck size={10} color={VextroTheme.accent} style={{marginRight: 4}} />
-               <Text style={styles.headerSub}>E2EE SECURE CHANNEL</Text>
+              <VxSecurityIcon size={10} color={VextroTheme.accent} style={{ marginRight: 4 }} />
+              <Text style={styles.headerSub}>E2EE SECURE CHANNEL</Text>
             </View>
           </View>
           <TouchableOpacity style={styles.headerBtn} onPress={() => setMenuVisible(true)}>
-            <MoreHorizontal color={VextroTheme.textMuted} size={24} />
+            <VxMoreIcon color={VextroTheme.textMuted} size={24} />
           </TouchableOpacity>
         </GlassView>
 
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.flex}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+
+        // Ścieżka: /workspaces/VEXTRO/frontend/src/screens/ChatScreen.js
+
+<KeyboardAvoidingView
+  behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+  style={styles.flex}
+  keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 25} // 25 to standardowa wysokość StatusBar, jeśli nie używasz SafeAreaview
+>
+  {/* Main Chat Area */}
+  <FlatList
+    ref={flatListRef}
+    data={[...messages].reverse()}
+    keyExtractor={(item) => item.id}
+    renderItem={renderItem}
+    inverted
+    contentContainerStyle={[styles.listContent, { paddingBottom: 20 }]}
+    maintainVisibleContentPosition={{
+      minIndexForVisible: 0,
+    }}
+  />
+
+  {/* Premium Bottom Input bar */}
+  <View style={styles.inputArea}>
+    <GlassView intensity={40} style={styles.inputBar}>
+      <TouchableOpacity onPress={() => setShowEmoji(!showEmoji)} style={styles.inputIcon}>
+        <VxVaultHandle size={24} color={VextroTheme.textMuted} isOpen={showEmoji} />
+      </TouchableOpacity>
+
+      <TextInput
+        style={styles.input}
+        value={inputText}
+        onChangeText={setInputText}
+        placeholder={isRecording ? `RECORDING... ${recordingDuration}s` : "Secure message..."}
+        placeholderTextColor={isRecording ? "#ff4444" : VextroTheme.textMuted}
+        selectionColor={VextroTheme.primary}
+        onFocus={() => setShowEmoji(false)}
+        editable={!isRecording}
+      />
+
+      {inputText.length > 0 ? (
+        <TouchableOpacity onPress={sendMessage} style={styles.sendBtn}>
+          <LinearGradient
+            colors={[VextroTheme.primary, VextroTheme.secondary]}
+            style={styles.sendBtnGradient}
+          >
+            <VxSendIcon size={18} color={VextroTheme.background} />
+          </LinearGradient>
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          onPressIn={startRecording}
+          onPressOut={stopRecording}
+          style={[styles.sendBtn, isRecording && { transform: [{ scale: 1.2 }] }]}
         >
-          {/* Main Chat Area */}
-          <FlatList
-            ref={flatListRef}
-            data={[...messages].reverse()}
-            keyExtractor={(item) => item.id}
-            renderItem={renderItem}
-            inverted
-            contentContainerStyle={styles.listContent}
-          />
-
-          {/* Premium Bottom Input bar */}
-          <View style={styles.inputArea}>
-            {showAntiVoiceMenu && (
-              <GlassView intensity={40} style={styles.antiVoiceOverlay}>
-                <TouchableOpacity 
-                  style={styles.antiVoiceOption} 
-                  onPress={() => { setShowAntiVoiceMenu(false); stopRecording('text'); }}
-                >
-                  <Type size={18} color={VextroTheme.primary} />
-                  <Text style={styles.antiVoiceLabel}>VOICE-TO-TEXT</Text>
-                </TouchableOpacity>
-                <View style={styles.antiVoiceDivider} />
-                <TouchableOpacity 
-                  style={styles.antiVoiceOption} 
-                  onPress={() => { setShowAntiVoiceMenu(false); stopRecording('voice'); }}
-                >
-                  <Volume2 size={18} color={VextroTheme.accent} />
-                  <Text style={styles.antiVoiceLabel}>VOICE-TO-VOICE</Text>
-                </TouchableOpacity>
-              </GlassView>
+          <LinearGradient
+            colors={isRecording ? ['#ff4444', '#cc0000'] : [VextroTheme.primary, VextroTheme.secondary]}
+            style={styles.sendBtnGradient}
+          >
+            {isRecording ? (
+              <VxMicIcon size={22} color="#fff" active={true} />
+            ) : (
+              <VxMicIcon size={22} color={VextroTheme.background} active={false} />
             )}
+          </LinearGradient>
+        </TouchableOpacity>
+      )}
+    </GlassView>
+  </View>
 
-            <GlassView intensity={40} style={styles.inputBar}>
-              <TouchableOpacity onPress={() => setShowEmoji(!showEmoji)} style={styles.inputIcon}>
-                <Smile color={VextroTheme.textMuted} size={22} />
-              </TouchableOpacity>
-              
-              <TextInput
-                style={styles.input}
-                value={inputText}
-                onChangeText={setInputText}
-                placeholder={isRecording ? `RECORDING... ${recordingDuration}s` : "Secure message..."}
-                placeholderTextColor={isRecording ? "#ff4444" : VextroTheme.textMuted}
-                selectionColor={VextroTheme.primary}
-                onFocus={() => setShowEmoji(false)}
-                editable={!isRecording}
-              />
+  {showEmoji && (
+    <View style={styles.emojiContainer}>
+      <EmojiPicker onSelect={(e) => setInputText(p => p + e)} />
+    </View>
+  )}
+</KeyboardAvoidingView>
 
-              {inputText.length > 0 ? (
-                <TouchableOpacity onPress={sendMessage} style={styles.sendBtn}>
-                   <LinearGradient
-                      colors={[VextroTheme.primary, VextroTheme.secondary]}
-                      style={styles.sendBtnGradient}
-                   >
-                      <SendHorizonal size={18} color={VextroTheme.background} />
-                   </LinearGradient>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity 
-                  onPressIn={startRecording}
-                  onLongPress={() => setShowAntiVoiceMenu(true)}
-                  onPressOut={() => { if (!showAntiVoiceMenu) stopRecording('voice'); }}
-                  style={[styles.sendBtn, isRecording && { transform: [{scale: 1.2}] }]}
-                >
-                   <LinearGradient
-                      colors={isRecording ? ['#ff4444', '#cc0000'] : [VextroTheme.primary, VextroTheme.secondary]}
-                      style={styles.sendBtnGradient}
-                   >
-                      {isRecording ? <MicOff size={18} color="#fff" /> : <Mic size={18} color={VextroTheme.background} />}
-                   </LinearGradient>
-                </TouchableOpacity>
-              )}
-            </GlassView>
-          </View>
 
-          {showEmoji && (
-            <View style={styles.emojiContainer}>
-                <EmojiPicker onSelect={(e) => setInputText(p => p + e)} />
-            </View>
-          )}
-
-        </KeyboardAvoidingView>
-
-        <GlassMenuModal 
-          visible={isMenuVisible} 
-          onClose={() => setMenuVisible(false)} 
+        <GlassMenuModal
+          visible={isMenuVisible}
+          onClose={() => setMenuVisible(false)}
           onAction={handleMenuAction}
           isMuted={isMuted}
           isBlocked={isBlocked}
@@ -523,8 +611,7 @@ export default function ChatScreen({ route, navigation }) {
   );
 }
 
-// Minimalistyczne importy dla gradiantów wewnątrz bąbelków
-import { LinearGradient } from 'expo-linear-gradient';
+
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
@@ -558,12 +645,12 @@ const styles = StyleSheet.create({
   headerTitle: { color: VextroTheme.text, fontWeight: '900', fontSize: 16, letterSpacing: 1 },
   headerSub: { color: VextroTheme.accent, fontSize: 8, fontWeight: '800', letterSpacing: 1 },
   headerStatusRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
-  
+
   listContent: { padding: 20, paddingBottom: 40 },
   msgContainer: { marginVertical: 8, width: '100%' },
   myContainer: { alignItems: 'flex-end' },
   otherContainer: { alignItems: 'flex-start' },
-  
+
   bubble: {
     padding: 14,
     paddingHorizontal: 16,
@@ -588,7 +675,7 @@ const styles = StyleSheet.create({
   msgText: { color: VextroTheme.background, fontSize: 15, fontWeight: '500', lineHeight: 20 },
   msgMeta: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', marginTop: 4, opacity: 0.7 },
   timestamp: { color: 'rgba(0,0,0,0.5)', fontSize: 9, fontWeight: '700', marginRight: 4 },
-  
+
   inputArea: { padding: 16, paddingTop: 8 },
   inputBar: {
     height: 56,
@@ -601,7 +688,7 @@ const styles = StyleSheet.create({
   inputIcon: { padding: 10 },
   sendBtn: { width: 44, height: 44, borderRadius: 22, overflow: 'hidden' },
   sendBtnGradient: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' },
-  
+
   voiceRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4 },
   playBtn: { width: 32, height: 32, borderRadius: 16, borderWeight: 1, borderColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)' },
   wavePlaceholder: { flex: 1, height: 2, backgroundColor: 'rgba(255,255,255,0.2)', marginHorizontal: 12, borderRadius: 1 },

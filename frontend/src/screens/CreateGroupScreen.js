@@ -4,9 +4,13 @@ import {
   TextInput, KeyboardAvoidingView, Platform, ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import {
-  ArrowLeft, Search, X, Check, Users, ShieldCheck
-} from 'lucide-react-native';
+import { 
+  VxBackIcon, 
+  VxRadarIcon, 
+  VxSecurityIcon, 
+  VxProfileIcon, 
+  VxInterfaceIcon 
+} from '../components/ui/icons/static';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -124,7 +128,7 @@ export default function CreateGroupScreen({ navigation }) {
           ]}
         >
           <View style={styles.avatarWrapper}>
-            <Text style={styles.avatarText}>👤</Text>
+            <VxProfileIcon size={30} />
           </View>
           <View style={styles.contactInfo}>
             <ScaledText style={styles.contactName} numberOfLines={1}>
@@ -137,7 +141,7 @@ export default function CreateGroupScreen({ navigation }) {
           
           {/* Checkbox */}
           <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
-            {isSelected && <Check size={12} color={VextroTheme.background} />}
+            {isSelected && <VxInterfaceIcon size={12} color={VextroTheme.background} />}
           </View>
         </GlassView>
       </TouchableOpacity>
@@ -150,7 +154,7 @@ export default function CreateGroupScreen({ navigation }) {
         onPress={() => mode === 'SET_GROUP_NAME' ? setMode('SELECT_MEMBERS') : navigation.goBack()} 
         style={styles.backBtn}
       >
-        <ArrowLeft color={VextroTheme.text} size={24} />
+        <VxBackIcon color={VextroTheme.text} size={24} />
       </TouchableOpacity>
       <View style={styles.headerTexts}>
         <ScaledText style={styles.headerTitle}>NOWA GRUPA</ScaledText>
@@ -174,7 +178,7 @@ export default function CreateGroupScreen({ navigation }) {
           <View style={styles.flex}>
             <View style={styles.searchSection}>
               <GlassView intensity={15} style={styles.searchBar}>
-                <Search size={18} color={VextroTheme.textMuted} style={{ marginRight: 12 }} />
+                <VxRadarIcon size={18} color={VextroTheme.textMuted} style={{ marginRight: 12 }} />
                 <TextInput
                   placeholder="SZUKAJ WĘZŁÓW..."
                   placeholderTextColor={VextroTheme.textMuted}
@@ -185,7 +189,7 @@ export default function CreateGroupScreen({ navigation }) {
                 />
                 {searchQuery.length > 0 && (
                   <TouchableOpacity onPress={() => setSearchQuery('')}>
-                    <X size={16} color={VextroTheme.textMuted} />
+                    <VxBackIcon size={16} color={VextroTheme.textMuted} style={{ transform: [{ rotate: '45deg' }] }} />
                   </TouchableOpacity>
                 )}
               </GlassView>
@@ -214,18 +218,18 @@ export default function CreateGroupScreen({ navigation }) {
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                 >
-                  <ArrowLeft size={24} color={VextroTheme.background} style={{ transform: [{ rotate: '180deg' }] }} />
+                  <VxBackIcon size={24} color={VextroTheme.background} style={{ transform: [{ rotate: '180deg' }] }} />
                 </LinearGradient>
               </TouchableOpacity>
             )}
           </View>
         ) : (
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
             <View style={styles.nameSetupContainer}>
               <View style={styles.groupIconPlaceholder}>
-                <Users size={48} color={VextroTheme.primary} />
+                <VxSecurityIcon size={48} color={VextroTheme.primary} />
                 <View style={styles.shieldBadge}>
-                  <ShieldCheck size={16} color={VextroTheme.background} />
+                  <VxSecurityIcon size={16} color={VextroTheme.background} />
                 </View>
               </View>
 

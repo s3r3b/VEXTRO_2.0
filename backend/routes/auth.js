@@ -2,64 +2,134 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
 
-// Endpoint do weryfikacji kodu i SEAMLESS IDENTITY (Login/Register)
-router.post('/verify-code', async (req, res) => {
-  try {
-    const { phoneNumber, code, publicKey } = req.body;
+// ============================================================
+// VEXTRO Auth Router v2.1 — Atomic E2EE Registration
+// Klucze X3DH są rejestrowane ATOMICZNIE razem z kontem.
+// Zero dwu-etapowego uploadu. Zero race conditions.
+// ============================================================
 
-    if (!phoneNumber || !code || !publicKey) {
-      return res.status(400).json({ error: 'Brakujące dane: phoneNumber, code i publicKey są wymagane.' });
-    }
-
-    // Normalizacja numeru (Cleaning non-numeric except '+')
-    const normalizedPhone = phoneNumber.replace(/[^\d+]/g, '');
+const verifyMockCode = (phone, code) => {
+    const normalizedPhone = phone.replace(/[^\d+]/g, '');
     const isAdmin = (normalizedPhone === '+48798884532' || normalizedPhone === '48798884532');
+    return code === (isAdmin ? '8958' : '1234');
+};
 
-    // MOCK: Weryfikacja kodu (8958 dla ADMINA, 1234 dla reszty)
-    if (isAdmin) {
-      console.log(`📡 [ADMIN_AUTH] Próba logowania tożsamości: ${normalizedPhone}`);
+// ----------------------------------------------------
+// 1. CREATE ACCOUNT — Rejestracja z atomicznym bundle E2EE
+// POST /api/auth/register
+// Body: { phoneNumber, code, publicKey, signedPreKey?, oneTimePreKeys? }
+// ----------------------------------------------------
+router.post('/register', async (req, res) => {
+  try {
+    const { phoneNumber, code, publicKey, signedPreKey, oneTimePreKeys } = req.body;
+
+    // --- Walidacja wejściowa ---
+    if (!phoneNumber || !code) {
+        return res.status(400).json({ error: 'Brak danych: numer telefonu i kod są wymagane.' });
     }
+    if (!publicKey) {
+        return res.status(400).json({ error: 'Brak klucza tożsamości (publicKey). Shield nie zainicjowany.' });
+    }
+
+    const normalizedPhone = phoneNumber.replace(/[^\d+]/g, '');
+
+    if (!verifyMockCode(normalizedPhone, code)) {
+      return res.status(401).json({ error: 'Nieprawidłowy kod weryfikacyjny.' });
+    }
+
+    // --- Sprawdź duplikat numeru ---
+    const existingUser = await User.findOne({ phoneNumber: normalizedPhone });
+    if (existingUser) {
+      return res.status(409).json({ error: 'Ten numer jest już zarejestrowany. Użyj opcji Log-in.' });
+    }
+
+    // --- Atomiczne tworzenie użytkownika z kluczami E2EE ---
+    // ENFORCE: All X3DH keys REQUIRED (protocol: ONE REQUEST, ONE KEYSET, ZERO CONFLICTS)
+    if (!signedPreKey?.key || !signedPreKey?.signature) {
+      return res.status(400).json({
+        error: 'Brak signedPreKey — X3DH registration wymaga pełnego bundle.'
+      });
+    }
+    if (!Array.isArray(oneTimePreKeys) || oneTimePreKeys.length === 0) {
+      return res.status(400).json({
+        error: 'Brak oneTimePreKeys — X3DH wymaga minimum 50 kluczy.'
+      });
+    }
+
+    const userPayload = {
+      phoneNumber: normalizedPhone,
+      publicKey: publicKey,
+      signedPreKey: signedPreKey,
+      oneTimePreKeys: oneTimePreKeys,
+    };
+
+    const newUser = await User.create(userPayload);
+
+    console.log(`🛡️ VEXTRO: NOWY AGENT ZAREJESTROWANY [${normalizedPhone}] | PublicKey: ${publicKey.substring(0, 12)}...`);
     
-    const requiredCode = isAdmin ? '8958' : '1234';
-    if (code !== requiredCode) {
-      return res.status(401).json({ error: 'Nieprawidłowy kod weryfikacyjny dla tej tożsamości.' });
-    }
-
-    // Proba UPSERTU tożsamości Shield
-    let user;
-    try {
-      user = await User.findOneAndUpdate(
-        { phoneNumber },
-        { 
-          phoneNumber, 
-          publicKey,
-          lastSeen: new Date()
-        },
-        { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true }
-      );
-    } catch (dbErr) {
-      if (dbErr.code === 11000) {
-        // Kolizja klucza publicznego z innym numerem
-        return res.status(409).json({ 
-          error: 'Shield Identity Conflict: Ten klucz publiczny jest już przypisany do innego numeru. Wygeneruj nową tożsamość lub użyj poprzedniego numeru.' 
-        });
-      }
-      throw dbErr;
-    }
-
-    console.log(`🛡️ VEXTRO: IDENTITY_SYNC: ${phoneNumber} [${user._id}]`);
-    
-    res.status(200).json({ 
-      message: 'Shield Identity Verified',
+    // Nigdy nie zwracamy prywatnych danych — tylko to co potrzeba na froncie
+    res.status(201).json({
+      message: 'Konto utworzone. Shield aktywny.',
       user: {
-        phoneNumber: user.phoneNumber,
-        publicKey: user.publicKey,
-        displayName: user.displayName || user.phoneNumber
+        id: newUser._id,
+        phoneNumber: newUser.phoneNumber,
+        displayName: newUser.displayName,
       }
     });
+
   } catch (err) {
-    console.error('❌ Błąd weryfikacji:', err);
-    res.status(500).json({ error: 'Błąd serwera podczas weryfikacji tożsamości.' });
+    console.error("❌ Błąd bazy danych:", err);
+    if (err.code === 11000) {
+        // Duplicate key — może to numer, może publicKey
+        const field = Object.keys(err.keyPattern || {})[0] || 'pole';
+        return res.status(409).json({ error: `Konflikt tożsamości: ${field} już istnieje w bazie.` });
+    }
+    res.status(500).json({ error: 'Błąd serwera przy rejestracji.' });
+  }
+});
+
+// ----------------------------------------------------
+// 2. LOG-IN — Weryfikacja tożsamości
+// POST /api/auth/login
+// Body: { phoneNumber, code }
+// ----------------------------------------------------
+router.post('/login', async (req, res) => {
+  try {
+    const { phoneNumber, code } = req.body;
+    if (!phoneNumber || !code) {
+        return res.status(400).json({ error: 'Brak danych: numer telefonu i kod są wymagane.' });
+    }
+
+    const normalizedPhone = phoneNumber.replace(/[^\d+]/g, '');
+
+    if (!verifyMockCode(normalizedPhone, code)) {
+      return res.status(401).json({ error: 'Nieprawidłowy kod weryfikacyjny.' });
+    }
+
+    const user = await User.findOne({ phoneNumber: normalizedPhone });
+    if (!user) {
+      return res.status(404).json({ error: 'Nie znaleziono konta. Zarejestruj się najpierw.' });
+    }
+
+    user.lastSeen = new Date();
+    await user.save();
+
+    console.log(`🛡️ VEXTRO: AGENT ZALOGOWANY [${normalizedPhone}]`);
+    
+    // Przy logowaniu zwracamy publicKey — klient może zweryfikować tożsamość
+    res.status(200).json({
+      message: 'Zalogowano pomyślnie.',
+      user: {
+        id: user._id,
+        phoneNumber: user.phoneNumber,
+        displayName: user.displayName,
+        publicKey: user.publicKey, // Potrzebne do weryfikacji E2EE po stronie klienta
+      }
+    });
+
+  } catch (err) {
+    console.error("❌ Błąd logowania:", err);
+    res.status(500).json({ error: 'Błąd serwera przy logowaniu.' });
   }
 });
 

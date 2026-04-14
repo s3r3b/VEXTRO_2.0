@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { VxGhostGate, VxPurgeIcon } from '../ui/icons/kinetic';
+import { VxGhostGate, VxPurgeIcon } from '../../components/ui/icons/kinetic';
 import { 
   VxContactCardIcon, 
   VxRadarIcon, 
@@ -10,7 +10,7 @@ import {
   VxBackIcon, 
   VxSecurityIcon, 
   VxShortcutIcon 
-} from '../ui/icons/static';
+} from '../../components/ui/icons/static';
 
 export default function GlassMenuModal({ isOpen, onClose, onAction, isMuted, isBlocked, isGhost }) {
   const [menuView, setMenuView] = useState('MAIN');

@@ -1,33 +1,79 @@
-# Analiza Technologiczna Projektu VEXTRO
+# VEXTRO - Architektura i Technologie (Stan Aktualny)
 
-Na podstawie plików konfiguracyjnych w obszarze roboczym `/workspaces/VEXTRO`, oto lista użytych technologii, paczek (rozszerzeń) oraz języków programowania:
+VEXTRO to zaawansowany system komunikacji szyfrowanej, bazujący na architekturze klient-serwer z całkowicie "ślepym" węzłem centralnym (Blind Server). Dokument ten opisuje stos technologiczny oraz unikalne mechanizmy wdrożone w systemie.
 
-## Języki Programowania
-- **JavaScript** (główny język używany zarówno w backendzie, jak i we frontendzie środowiska Node.js / React Native)
+## 1. Główne Środowisko (Stack Technologiczny)
+- **Node.js & Express.js** - Wysokowydajny serwer obsługujący API REST oraz WebSockets.
+- **React 19 + Vite** - WebApp frontend (desktop/browser), zbudowany z Vite dev server, zamieniając React Native.
+- **Tailwind CSS** - Styling i theming w WebApp.
+- **Socket.io** - Silnik komunikacji czasu rzeczywistego wykorzystywany do routingu wiadomości oraz handshake'u urządzeń.
+- **MongoDB / Mongoose** - Baza danych NoSQL przetrzymująca metadane, relacje kontaktów oraz zaszyfrowane pakiety w formacie ślepym.
 
-## Technologie i Frameworki
-- **Node.js** (środowisko uruchomieniowe)
-- **React Native** (tworzenie aplikacji mobilnych/webowych)
-- **Expo** (zestaw narzędzi roboczych dla React Native)
-- **Express.js** (framework webowy dla Node.js dający infrastrukturę serwerową)
-- **MongoDB** (baza danych typu NoSQL)
+---
 
-## Rozszerzenia / Biblioteki (Zależności)
+## 2. Architektura Bezpieczeństwa Kryptografii
 
-### 🖥️ Backend (`/workspaces/VEXTRO/backend`)
-- `express` - Serwer HTTP
-- `mongoose` - Modelowanie danych dla MongoDB (ODM)
-- `socket.io` - Komunikacja w czasie rzeczywistym (WebSockets)
-- `cors` - Obsługa mechanizmu współdzielenia zasobów między źródłami (CORS)
-- `crypto-js` - Funkcje kryptograficzne do szyfrowania i haszowania
-- `dotenv` - Ładowanie zmiennych środowiskowych z plików `.env`
-- `nodemon` (devDependencies) - Automatyczne restartowanie serwera w trakcie pracy deweloperskiej
+**➡️ PEŁNY OPIS**: `KRYPTOGRAFIA.md` (kompendium + niegotowe rzeczy)
 
-### 📱 Frontend (`/workspaces/VEXTRO/frontend`)
-- `react`, `react-native`, `react-dom`, `react-native-web` - Główne biblioteki do budowy interfejsu
-- `expo`, `expo-status-bar`, `expo-crypto`, `expo-image-picker` - Moduły z ekosystemu Expo
-- `@react-navigation/native`, `@react-navigation/stack` - Nawigacja i routing w aplikacji
-- `axios` - Klient HTTP do komunikacji z backendem API
-- `socket.io-client` - Odbiorca i nadawca zdarzeń (WebSockets) od strony klienta
-- `@react-native-async-storage/async-storage` - Przechowywanie danych lokalnie na urządzeniu
-- `react-native-qrcode-svg`, `react-native-svg` - Generowanie i obsługa grafiki wektorowej (w tym kodów QR)
+Sercem prywatności VEXTRO: `ShieldEngine.js` (Double Ratchet) + X3DH key exchange. Backend **nie ma kluczy prywatnych**.
+
+**Status**: 70% complete
+- ✅ X3DH, OPK consumption, out-of-order messages, DH ratchet
+- ⏳ Group message keys, per-message HMAC signatures, per-message DH ratchet
+
+---
+
+## 3. Kluczowe Systemy VEXTRO
+
+### 👻 Ghost Mode (Tryb Ducha)
+Mechanizm operujący na warstwie bazy danych (właściwość `isGhost`). Włączenie trybu Ducha przez użytkownika skutkuje:
+- Natychmiastowym zniknięciem z globalnej tablicy odkrywania sieci (`/api/users/all`).
+- Blokadą możliwości nawiązania nowych połączeń (API zwraca błąd 403 lub 404 dla zapytań o kontakt).
+- Uniemożliwieniem namierzenia użytkownika przez wyszukiwarkę po numerze telefonu.
+
+### 🎙️ Anti-Voice Protocol
+Zaawansowany moduł konwersji i obsługi notatek głosowych, zintegrowany z interfejsem ChatScreen (korzystający z `expo-av`):
+- **Voice-to-Text**: Pozwala nagrać notatkę audio, która jest asynchronicznie przesyłana do silnika na serwerze (`/api/media/transcribe`), konwertowana na tekst i podmieniana w polu wejściowym gotowa do bezpiecznej wysyłki.
+- **Voice-to-Voice**: Tradycyjne wysłanie notatki jako zaszyfrowanego bloba danych z dedykowanym interfejsem (fala, czas trwania), ukrywające metadane przed dostawcą sieci.
+
+### 🔗 Premium Web Auth (Scanner Handshake)
+Autorski system parowania urządzeń za pomocą Socket.io:
+1. WebApp (Terminal) wysyła żądanie `init_web_session` i czeka w odizolowanym pokoju nasłuchując.
+2. Urządzenie mobilne wykorzystuje `expo-camera` do zeskanowania kodu QR zawierającego `sessionId` i URL serwera.
+3. Mobilny skaner wywołuje `authorize_web_session` przekazując klucze uwierzytelniające, co aktywuje sesję na terminalu. Zapewnia to bezpieczne logowanie bez podawania haseł tekstowych.
+
+### 💻 Admin Shell (God Mode)
+Wbudowany terminal administracyjny operujący na `node-pty`. Dostępny wyłącznie dla predefiniowanych numerów (np. Admin +48...). Pozwala na interakcję z powłoką BASH serwera bezpośrednio z przeglądarki poprzez bezpieczny tunel WebSocket.
+
+---
+
+## 4. UI/UX: System VEXTRO Premium Design
+Projekt kategorycznie odrzuca generyczne biblioteki komponentów na rzecz autorskich rozwiązań opartych o wytyczne "Future Design":
+- **Zaawansowany Glassmorphism**: Komponenty `GlassView` wykorzystujące rozmycie tła, precyzyjne oświetlenie krawędzi (soft lighting) oraz gradienty liniowe (`expo-linear-gradient`).
+- **Kinetyka**: Płynne animacje mikrointerakcji dla każdego przycisku czy modalu (obsługiwane natywnymi animacjami React Native lub framer-motion w WebApp).
+- **Motywy Środowiskowe**: Obsługa profili wizualnych takich jak `Plasma Core`, `Deep Void`, `Neon Grid`, `Ghost Shell` ze wspólnym zarządzaniem tokenami na poziomie CSS/Tailwind oraz Native.
+- **Reakcje Haptyczne**: System `expo-haptics` wspierający każdą ważną operację systemową (np. udane skanowanie QR, blokada kontaktu).
+
+---
+
+## 5. Wykaz Zależności (Zestawienie Pakietów)
+
+**Backend:**
+- `express`, `socket.io` - Infrastruktura sieciowa i routing E2EE.
+- `mongoose` - ODM dla relacji i obiektów bazy.
+- `node-pty` - Generowanie interaktywnych powłok systemowych.
+- `cors`, `dotenv` - Bezpieczeństwo i konfiguracja.
+- `tweetnacl` - Kryptografia X25519 + nacl.box, używana w ShieldEngine (Double Ratchet).
+- `multer` - Upload plików (media: audio, obrazy) do `uploads/`.
+- `form-data`, `axios` - Obsługa żądań HTTP z payload'em.
+- `crypto-js` - Dodatkowe operacje kryptograficzne.
+- `node-bash-title` - Utility dla tytułów procesów.
+
+**WebApp (React 19 + Vite):**
+- **Build/Dev**: `vite`, `@vitejs/plugin-react` - Build tool i dev server.
+- **Styling**: `tailwindcss` - Utility CSS framework.
+- **UI/UX**: `framer-motion` (animacje, transitions), `qrcode.react` (QR code generacja), `lucide-react` (ikony).
+- **Routing**: `react-router-dom` - Routing aplikacji (/login, /chat).
+- **Kryptografia**: `tweetnacl` (NACL), `buffer` (polyfill), własna implementacja `hmacSha256`.
+- **Komunikacja**: `axios` (żądania REST), `socket.io-client` (komunikacja real-time).
+- **Stan**: `localStorage` (browser storage).

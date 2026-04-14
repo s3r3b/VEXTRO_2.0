@@ -7,15 +7,19 @@ import QrPanel from '../components/ui/QrPanel';
 import PhoneAuthPanel from '../components/ui/PhoneAuthPanel';
 import NetworkConfig from '../services/NetworkConfig';
 import { useShield } from '../context/ShieldContext';
+import { cryptoCore } from '../utils/cryptoCore';
+import { apiService } from '../services/apiService';
+import StorageManager from '../utils/StorageManager';
 
 export default function LoginScreen() {
   const [sessionId, setSessionId] = useState(null);
   const [serverUrl, setServerUrl] = useState(null);
-  const [status, setStatus] = useState('initializing'); // initializing, awaiting, detected, authorized, registering
+  const [status, setStatus] = useState('initializing');
   const [timeLeft, setTimeLeft] = useState(120);
   const [errorMessage, setErrorMessage] = useState('');
   const [customHubUrl, setCustomHubUrl] = useState(localStorage.getItem('vextro_custom_hub') || '');
   const [showHubConfig, setShowHubConfig] = useState(false);
+  const [authMode, setAuthMode] = useState('login');
   const { identity, isReady } = useShield();
   const navigate = useNavigate();
 
@@ -35,7 +39,7 @@ export default function LoginScreen() {
     });
 
     socket.on('session_initialized', (data) => {
-       const backendPort = 5050; // Domyślny port VEXTRO Hub
+       const backendPort = 5050;
        const currentHost = window.location.hostname;
        const hubUrl = customHubUrl || `http://${currentHost}:${backendPort}`;
        
@@ -45,9 +49,34 @@ export default function LoginScreen() {
        setStatus('awaiting');
     });
 
-    socket.on('web_session_authorized', (data) => {
+    socket.on('web_session_authorized', async (data) => {
        setStatus('authorized');
        console.log("🔒 Autoryzacja udana!", data);
+       
+       const phone = data.userData?.phone || data.token;
+       if (phone) {
+         localStorage.setItem('userPhone', phone);
+         
+         try {
+           try {
+             await apiService.fetchReceiverKeys(phone);
+             console.log("🔑 [X3DH] Klucze dla tego węzła już istnieją na serwerze.");
+           } catch  {
+             console.log("🔑 [X3DH] Brak kluczy na serwerze. Generowanie nowej paczki...");
+             const { bundle, localKeys } = cryptoCore.generateX3DHBundle();
+             await apiService.uploadKeys({
+               phoneNumber: phone,
+               identityKey: bundle.identityKey,
+               signedPreKey: bundle.signedPreKey,
+               oneTimePreKeys: bundle.oneTimePreKeys
+             });
+             localStorage.setItem('vextro_x3dh_local_keys', JSON.stringify(localKeys));
+             console.log("🔑 [X3DH] Nowa paczka kluczy została pomyślnie wysłana!");
+           }
+         } catch (err) {
+           console.error("🔑 [X3DH] Błąd podczas obsługi kluczy:", err);
+         }
+       }
        
        setTimeout(() => {
          socket.disconnect();
@@ -69,67 +98,113 @@ export default function LoginScreen() {
       socket.disconnect();
       clearInterval(timer);
     };
-  }, [navigate]);
+  }, [navigate, customHubUrl]);
 
   const handleManualAuthorize = async (data) => {
-    setErrorMessage('');
-    
-    // Zapisanie sesji lokalnej
-    localStorage.setItem('userPhone', data.identifier);
+      console.log("🚀 [DEBUG] Przycisk kliknięty! Dane:", data);
+      setErrorMessage('');
+      
+      try {
+        setStatus('registering');
 
-    // Aby umożliwić odnalezienie tego kontaktu z innych urządzeń i P2P
-    try {
-       setStatus('registering');
-       
-       // Upewnij się, że klucze Shield są wygenerowane
-       const pubKey = identity?.publicKey || localStorage.getItem('vextro_identity_public');
-       
-       if (!pubKey) {
-          throw new Error("Błąd Inicjalizacji Shield: Brak kluczy tożsamości.");
-       }
+        if (authMode === 'register') {
+          // ============================================================
+          // FLOW REJESTRACJI — Atomiczny, E2EE-first
+          // Krok 1: Wygeneruj pełny bundle X3DH po stronie klienta
+          // Krok 2: Wyślij wszystko w JEDNYM requeście do backendu
+          // Brak dwu-etapowego uploadu = brak race conditions
+          // ============================================================
+          
+          console.log("🔑 [X3DH] Generowanie paczki tożsamości przed rejestracją...");
+          const { bundle, localKeys } = cryptoCore.generateX3DHBundle();
+          
+          // Klucz tożsamości X3DH staje się "publicKey" w bazie danych
+          const publicKey = bundle.identityKey;
+          
+          if (!publicKey) {
+            throw new Error("Krytyczny błąd: cryptoCore nie wygenerował klucza tożsamości.");
+          }
 
-       // Rejestracja w bazie centralnej
-       await axios.post(`${NetworkConfig.getSocketUrl()}/api/auth/verify-code`, {
-         phoneNumber: data.identifier,
-         code: data.code, // Używamy realnego kodu z UI
-         publicKey: pubKey
-       });
+          console.log("🔑 [X3DH] Bundle gotowy. Inicjuję atomiczną rejestrację...");
 
-       console.log("🛡️ WebApp Node Registered successfully.");
-       setStatus('authorized');
-       
-       setTimeout(() => {
-         navigate('/chat');
-       }, 1500);
+          await axios.post(
+            `${NetworkConfig.getSocketUrl()}/api/auth/register`,
+            {
+              phoneNumber: data.identifier,
+              code: data.code,
+              publicKey: publicKey,
+              signedPreKey: bundle.signedPreKey,
+              oneTimePreKeys: bundle.oneTimePreKeys,
+            }
+          );
 
-    } catch (e) {
-       console.error("KRYTYCZNY BŁĄD REJESTRACJI:", e);
-       setErrorMessage(e.response?.data?.error || e.message || "Błąd synchronizacji z VEXTRO Hub");
-       setStatus('awaiting'); // Cofnij do wyboru numeru
-       localStorage.removeItem('userPhone');
-    }
+          // Zapisz klucze prywatne TYLKO po potwierdzeniu sukcesu z serwera
+          StorageManager.setUserPhone(data.identifier);
+          StorageManager.setX3DHKeys(localKeys);
+          StorageManager.setIdentityPublic(publicKey);
+
+          console.log("✅ [X3DH] Rejestracja zakończona sukcesem. Klucze zapisane lokalnie.");
+
+        } else {
+          // ============================================================
+          // FLOW LOGOWANIA — Weryfikacja + sprawdzenie kluczy lokalnych
+          // ============================================================
+          
+          await axios.post(
+            `${NetworkConfig.getSocketUrl()}/api/auth/login`,
+            {
+              phoneNumber: data.identifier,
+              code: data.code,
+            }
+          );
+
+          StorageManager.setUserPhone(data.identifier);
+
+          const localKeys = StorageManager.getX3DHKeys();
+          if (!localKeys) {
+            console.warn("⚠️ [X3DH] Brak kluczy lokalnych na tym urządzeniu. Stare wiadomości będą nieczytelne.");
+          } else {
+            console.log("✅ [X3DH] Klucze lokalne znalezione. Sesja E2EE gotowa.");
+          }
+        }
+
+        console.log(`🛡️ WebApp: ${authMode.toUpperCase()} SUCCESS.`);
+        setStatus('authorized');
+
+        setTimeout(() => {
+          navigate('/chat');
+        }, 1500);
+
+      } catch (e) {
+        console.error("KRYTYCZNY BŁĄD AUTORYZACJI:", e);
+        const errorMsg = e.response?.data?.error || e.message || "Błąd komunikacji z VEXTRO Hub";
+        setErrorMessage(errorMsg);
+        setStatus('awaiting');
+        // Czyścimy localStorage tylko jeśli rejestracja się nie powiodła
+        // przy błędzie logowania nie czyścimy — klucze mogą już istnieć
+        if (authMode === 'register') {
+          StorageManager.clear(); // Atomic cleanup on registration error
+        }
+      }
   };
 
   const handleSaveHub = () => {
     localStorage.setItem('vextro_custom_hub', customHubUrl);
     setShowHubConfig(false);
-    // Restart session to apply new URL to QR
     window.location.reload();
   };
 
   return (
     <div className="min-h-screen relative flex items-center justify-center p-6 bg-[#040b14] overflow-hidden">
-      {/* Background Kinetic Elements */}
       <div className="absolute inset-0 z-0 pointer-events-none">
         <div className="bg-orb w-[600px] h-[600px] bg-primary/10 top-[-20%] left-[-10%] animate-float"></div>
         <div className="bg-orb w-[500px] h-[500px] bg-accent/5 bottom-[-10%] right-[-10%] animate-float" style={{ animationDelay: '-5s' }}></div>
       </div>
 
-      {/* Main Login Interface */}
       <motion.div 
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.8, ease: "easeOut" }}
+        transition={{ type: "spring", stiffness: 100, damping: 20, mass: 0.8 }}
         className="z-10 w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-12 items-center"
       >
         {/* Left Pane: QR Sync */}
@@ -152,36 +227,8 @@ export default function LoginScreen() {
                 />
                 )}
             </motion.div>
-
-            {/* TUNNEL/HUB OVERRIDE (For Ngrok/LAN Issues) */}
-            <div className="mt-8 w-full max-w-xs">
-                {!showHubConfig ? (
-                    <button 
-                        onClick={() => setShowHubConfig(true)}
-                        className="text-[9px] font-mono text-white/20 hover:text-primary transition-colors tracking-widest uppercase"
-                    >
-                        [ CONFIG_NODE_OVERRIDE ]
-                    </button>
-                ) : (
-                    <div className="bg-white/5 p-4 rounded-xl border border-white/10 space-y-3">
-                        <p className="text-[9px] font-mono text-primary tracking-widest uppercase">TUNNEL_ADDRESS (Ngrok/IP):</p>
-                        <input 
-                            type="text"
-                            value={customHubUrl}
-                            onChange={(e) => setCustomHubUrl(e.target.value)}
-                            placeholder="https://xyz.ngrok-free.app"
-                            className="w-full bg-black/40 border border-white/10 p-2 rounded text-[10px] text-white font-mono outline-none focus:border-primary/40"
-                        />
-                        <div className="flex gap-2">
-                            <button onClick={handleSaveHub} className="flex-1 bg-primary/20 text-primary p-2 rounded text-[9px] font-bold uppercase hover:bg-primary/30 transition-all">SAVE_RELOAD</button>
-                            <button onClick={() => setShowHubConfig(false)} className="flex-1 bg-white/5 text-white/40 p-2 rounded text-[9px] font-bold uppercase hover:bg-white/10">CANCEL</button>
-                        </div>
-                    </div>
-                )}
-            </div>
         </div>
 
-        {/* Vertical Divider (Desktop Only) */}
         <div className="hidden lg:block absolute left-1/2 top-1/4 bottom-1/4 w-[1px] bg-gradient-to-b from-transparent via-white/10 to-transparent"></div>
 
         {/* Right Pane: Phone Auth */}
@@ -190,19 +237,43 @@ export default function LoginScreen() {
                 initial={{ opacity: 0, x: 30 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.5 }}
-                className="w-full flex justify-center"
+                className="w-full flex flex-col items-center"
             >
-                <div className="w-full max-w-sm glass-panel-heavy p-10 relative overflow-hidden group">
-                    {/* Inner Decorative Elements */}
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 blur-3xl -mr-16 -mt-16 group-hover:bg-primary/10 transition-all duration-700"></div>
-                    
-                    <PhoneAuthPanel onAuthorize={handleManualAuthorize} />
+                <div className="flex justify-center gap-4 mb-8 relative z-20">
+                    <button 
+                        type="button"
+                        onClick={() => setAuthMode('login')}
+                        className={`px-6 py-2 rounded-lg font-orbitron text-[10px] tracking-[0.2em] transition-all duration-500 border backdrop-blur-md ${
+                            authMode === 'login' 
+                            ? 'bg-accent/20 border-accent/50 text-accent shadow-[0_0_20px_rgba(0,240,255,0.2)]' 
+                            : 'bg-white/5 border-white/10 text-white/30 hover:bg-white/10 hover:text-white/60'
+                        }`}
+                    >
+                        LOG-IN
+                    </button>
+                    <button 
+                        type="button"
+                        onClick={() => setAuthMode('register')}
+                        className={`px-6 py-2 rounded-lg font-orbitron text-[10px] tracking-[0.2em] transition-all duration-500 border backdrop-blur-md ${
+                            authMode === 'register' 
+                            ? 'bg-primary/20 border-primary/50 text-primary shadow-[0_0_20px_rgba(255,42,85,0.2)]' 
+                            : 'bg-white/5 border-white/10 text-white/30 hover:bg-white/10 hover:text-white/60'
+                        }`}
+                    >
+                        CREATE ACCOUNT
+                    </button>
                 </div>
+                
+                {/* Wpięty komponent autoryzacji! */}
+                <PhoneAuthPanel 
+                    onAuthorize={handleManualAuthorize}
+                    buttonText={authMode === 'register' ? 'INITIALIZE_IDENTITY' : 'VERIFY_ACCESS'}
+                />
+
             </motion.div>
         </div>
       </motion.div>
 
-      {/* Success / Registering Overlay */}
       <AnimatePresence>
         {(status === 'authorized' || status === 'registering') && (
             <motion.div 

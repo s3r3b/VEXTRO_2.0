@@ -38,24 +38,4 @@ router.post('/upload', upload.single('file'), (req, res) => {
     });
 });
 
-/**
- * POST /api/media/transcribe
- * Mock-up silnika Whisper. W wersji produkcyjnej tu uderzamy do OpenAI lub lokalnego modelu.
- */
-router.post('/transcribe', upload.single('file'), (req, res) => {
-    // Symulacja czasu pracy sieci neuronowej
-    const mockTranscriptions = [
-        "Jasne, rozumiem. Przesyłam potwierdzenie.",
-        "Spotkanie o 10:00 w kwaterze głównej.",
-        "Protokół Shield został aktywowany pomyślnie.",
-        "VEXTRO to przyszłość bezpiecznej komunikacji."
-    ];
-
-    const randomText = mockTranscriptions[Math.floor(Math.random() * mockTranscriptions.length)];
-
-    setTimeout(() => {
-        res.json({ text: `[ANTIVOICE_TRANSCRIPTION]: ${randomText}` });
-    }, 1500);
-});
-
 module.exports = router;

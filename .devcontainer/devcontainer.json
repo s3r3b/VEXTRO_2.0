@@ -12,25 +12,11 @@
       ]
     }
   },
-  "forwardPorts": [
-    5173,
-    5050,
-    8081
-  ],
+  "forwardPorts": [5050, 5173, 8081],
   "portsAttributes": {
-    "5173": {
-      "label": "WebApp (Vite)",
-      "onAutoForward": "notify"
-    },
-    "5050": {
-      "label": "VEXTRO Hub (Backend)",
-      "onAutoForward": "notify",
-      "visibility": "public"
-    },
-    "8081": {
-      "label": "Metro Bundler (Mobile)",
-      "onAutoForward": "notify"
-    }
+    "5050": { "label": "Backend API", "hostIP": "0.0.0.0", "elevateIfNeeded": true },
+    "5173": { "label": "WebApp", "hostIP": "0.0.0.0", "elevateIfNeeded": true },
+    "8081": { "label": "Expo Metro", "hostIP": "0.0.0.0", "elevateIfNeeded": true }
   },
   "remoteUser": "node",
   "workspaceFolder": "/workspaces/VEXTRO",

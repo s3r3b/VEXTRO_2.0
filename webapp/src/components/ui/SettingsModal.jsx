@@ -20,6 +20,7 @@ export default function SettingsModal({ isOpen, onClose }) {
   const [nickname, setNickname] = useState(localStorage.getItem('userNickname') || 'GHOST');
   const [phone] = useState(localStorage.getItem('userPhone') || '—');
   const [isAiEnabled, setIsAiEnabled] = useState(localStorage.getItem('ai_enabled') === 'true');
+  const [aiNick, setAiNick] = useState(localStorage.getItem('ai_nick') || '');
   const { themeId, setThemeId, activeTheme } = useTheme();
 
   useEffect(() => {
@@ -29,6 +30,7 @@ export default function SettingsModal({ isOpen, onClose }) {
   const handleSave = () => {
     localStorage.setItem('ai_api_key', aiKey);
     localStorage.setItem('ai_enabled', isAiEnabled);
+    localStorage.setItem('ai_nick', aiNick);
     localStorage.setItem('ui_scale', uiScale);
     localStorage.setItem('userNickname', nickname);
     onClose();
@@ -343,6 +345,22 @@ className="overflow-hidden space-y-8"
                         </div>
                         <p className="mt-2 text-[9px] text-white/20 uppercase font-mono tracking-tight">
                           Klucz przechowywany lokalnie — zasila VEXTRO Neural Engine.
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-mono text-white/40 uppercase mb-3 tracking-widest">
+                          Neural Agent Nickname (Optional)
+                        </label>
+                        <input
+                          type="text"
+                          value={aiNick}
+                          onChange={(e) => setAiNick(e.target.value)}
+                          placeholder="YOUR API CHATBOT AI"
+                          className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-4 text-sm font-mono focus:outline-none focus:border-primary/50 focus:bg-white/[0.05] transition-all"
+                        />
+                        <p className="mt-2 text-[9px] text-white/20 uppercase font-mono tracking-tight">
+                          Spersonalizowana nazwa widoczna na liście kontaktów i w oknie czatu.
                         </p>
                       </div>
 

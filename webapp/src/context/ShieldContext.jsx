@@ -11,29 +11,6 @@ export const ShieldProvider = ({ children }) => {
   const [groupKeys, setGroupKeys] = useState({}); // { groupId: UInt8Array }
   const [isReady, setIsReady] = useState(false);
 
-  // 1. Initialize Identity
-  useEffect(() => {
-    const init = async () => {
-      let pubKey = localStorage.getItem('vextro_identity_public');
-      let privKey = localStorage.getItem('vextro_identity_private');
-
-      if (!pubKey || !privKey) {
-        console.log('🛡️ [SHIELD WEB] GENERATING_IDENTITY: Industrial-grade keys...');
-        const keyPair = nacl.box.keyPair();
-        pubKey = Buffer.from(keyPair.publicKey).toString('base64');
-        privKey = Buffer.from(keyPair.secretKey).toString('base64');
-
-        localStorage.setItem('vextro_identity_public', pubKey);
-        localStorage.setItem('vextro_identity_private', privKey);
-      }
-
-      setIdentity({ publicKey: pubKey });
-      loadSessions();
-      setIsReady(true);
-    };
-    init();
-  }, []);
-
   // 2. Load Sessions from storage
   const loadSessions = () => {
     try {
@@ -63,6 +40,22 @@ export const ShieldProvider = ({ children }) => {
       console.error('🛡️ [SHIELD WEB] SESSION_SAVE_ERROR:', e);
     }
   };
+
+  // 1. Initialize Identity from localStorage (set during registration/login)
+  useEffect(() => {
+    const init = async () => {
+      // X3DH system: publicKey is stored during registration by LoginScreen
+      const publicKey = localStorage.getItem('vextro_identity_public');
+      if (publicKey) {
+        setIdentity({ publicKey });
+      } else {
+        console.warn('🛡️ [SHIELD] No identity found. User not registered on this device.');
+      }
+      loadSessions();
+      setIsReady(true);
+    };
+    init();
+  }, []);
 
   /**
    * Start a new E2EE session with a contact

@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { VxMicIcon, VxSendIcon, VxRadarIcon, VxMediaIcon, VxBackIcon } from '../ui/icons/kinetic';
+import { VxMicIcon, VxSendIcon } from '../../components/ui/icons/kinetic';
+import { VxRadarIcon, VxMediaIcon, VxBackIcon } from '../../components/ui/icons/static';
+import { useShield } from '../../context/ShieldContext';
 import axios from 'axios';
 import NetworkConfig from '../../services/NetworkConfig';
 
-export default function MessageInput({ onSendMessage, isAI, disabled }) {
+export default function MessageInput({ onSendMessage, isAI, disabled, activeContactPhone }) {
   const [text, setText] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
@@ -60,29 +62,40 @@ export default function MessageInput({ onSendMessage, isAI, disabled }) {
     }
   };
 
+  const { sessions, encryptFor } = useShield();
+
   const handleAntiVoiceAction = async (mode) => {
-    if (!audioBlob) return;
+    if (!audioBlob || !activeContactPhone) return;
     setShowVoiceMenu(false);
 
     try {
-      const formData = new FormData();
-      const file = new File([audioBlob], 'voice.webm', { type: 'audio/webm' });
-      formData.append('file', file);
-
-      if (mode === 'text') {
-        const res = await axios.post(`${NetworkConfig.getSocketUrl()}/api/media/transcribe`, formData);
-        if (res.data.text) {
-          setText(prev => (prev ? prev + ' ' : '') + res.data.text);
+      if (mode === 'voice') {
+        if (!sessions[activeContactPhone]) {
+          alert("🛡️ [SHIELD] Brak aktywnej zapadni. Nie można zabezpieczyć audio.");
+          return;
         }
-      } else {
-        // V2V: Voice-to-Voice (E2EE Payload)
+
+        // 1. Konwersja Blob -> ArrayBuffer -> Uint8Array
+        const arrayBuffer = await audioBlob.arrayBuffer();
+        const audioData = new Uint8Array(arrayBuffer);
+
+        // 2. Szyfrowanie ShieldEngine
+        const { header, ciphertext, nonce } = await encryptFor(activeContactPhone, audioData);
+
+        // 3. Wysłanie zaszyfrowanego pliku
+        const encryptedBlob = new Blob([Buffer.from(ciphertext, 'base64')], { type: 'application/octet-stream' });
+        const formData = new FormData();
+        formData.append('file', encryptedBlob, 'shield_voice.bin');
+
         const uploadRes = await axios.post(`${NetworkConfig.getSocketUrl()}/api/media/upload`, formData);
+        
         if (uploadRes.data.url) {
-          onSendMessage(uploadRes.data.url, 'voice', recordingDuration);
+          // Przekazujemy rozszerzone dane do ChatScreen
+          onSendMessage(uploadRes.data.url, 'voice', recordingDuration, { header, nonce });
         }
       }
     } catch (e) {
-      console.error("Media processing error:", e);
+      console.error("🛡️ [SHIELD] Web Voice Encryption Error:", e);
     }
     setAudioBlob(null);
   };
@@ -131,14 +144,6 @@ export default function MessageInput({ onSendMessage, isAI, disabled }) {
                   exit={{ opacity: 0, y: 10, scale: 0.9 }}
                   className="absolute bottom-full right-0 mb-4 w-48 glass-panel-heavy border border-primary/30 p-2 z-50 rounded-2xl shadow-neon-primary/20"
                 >
-                  <button 
-                    onClick={() => handleAntiVoiceAction('text')}
-                    className="w-full flex items-center gap-3 p-3 hover:bg-primary/10 rounded-xl transition-colors text-white group"
-                  >
-                    <VxRadarIcon size={16} color="var(--color-primary)" />
-                    <span className="text-[10px] font-mono uppercase tracking-widest">Voice-to-Text</span>
-                  </button>
-                  <div className="h-[1px] bg-white/5 my-1 mx-2" />
                   <button 
                     onClick={() => handleAntiVoiceAction('voice')}
                     className="w-full flex items-center gap-3 p-3 hover:bg-accent/10 rounded-xl transition-colors text-white group"

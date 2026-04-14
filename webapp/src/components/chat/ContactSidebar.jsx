@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { VxGearIcon } from '../ui/icons/kinetic';
+import { VxGearIcon } from '../../components/ui/icons/kinetic';
 import { 
   VxRadarIcon, 
   VxBackIcon, 
@@ -8,21 +8,12 @@ import {
   VxNeuralIcon, 
   VxSecurityIcon,
   VxProfileIcon 
-} from '../ui/icons/static';
+} from '../../components/ui/icons/static';
 import ContactsService from '../../services/ContactsService';
 import GroupService from '../../services/GroupService';
 import NetworkConfig from '../../services/NetworkConfig';
 import axios from 'axios';
 import { useShield } from '../../context/ShieldContext';
-
-// ─── AI CONTACT (zawsze na górze) ────────────────────────────────────────────
-const AI_CONTACT = {
-  _id: 'vextro-ai',
-  contactPhone: 'AI',
-  displayName: 'VEXTRO AI',
-  isAI: true,
-  lastMessage: { content: 'Neural engine gotowy.' },
-};
 
 export default function ContactSidebar({ onOpenSettings, onSelectContact, activeContactPhone }) {
   const [contacts, setContacts] = useState([]);
@@ -31,6 +22,29 @@ export default function ContactSidebar({ onOpenSettings, onSelectContact, active
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [myPhone] = useState(() => localStorage.getItem('userPhone') || '');
+
+  // ─── AI CONFIG STATE ───────────────────────────────────────────────────────
+  const [aiConfig, setAiConfig] = useState({
+    enabled: localStorage.getItem('ai_enabled') === 'true',
+    nick: localStorage.getItem('ai_nick') || 'YOUR API CHATBOT AI'
+  });
+
+  // Nasłuchuj zmian w localStorage (dla synchronizacji po zamknięciu SettingsModal)
+  useEffect(() => {
+    const handleStorageChange = () => {
+      setAiConfig({
+        enabled: localStorage.getItem('ai_enabled') === 'true',
+        nick: localStorage.getItem('ai_nick') || 'YOUR API CHATBOT AI'
+      });
+    };
+    window.addEventListener('storage', handleStorageChange);
+    // Dodatkowy interwał dla pewności (niektóre przeglądarki nie wyzwalają storage na tej samej karcie)
+    const interval = setInterval(handleStorageChange, 1000);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
+  }, []);
 
   // ─── LOGIKA ANIMOWANEGO SZUKANIA (WEB) ──────────────────────────────────────
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -55,11 +69,23 @@ export default function ContactSidebar({ onOpenSettings, onSelectContact, active
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  const combined = [
-    AI_CONTACT,
+  const combined = [];
+  
+  // Dodaj AI tylko jeśli jest włączone
+  if (aiConfig.enabled) {
+    combined.push({
+      _id: 'vextro-ai',
+      contactPhone: 'AI',
+      displayName: aiConfig.nick,
+      isAI: true,
+      lastMessage: { content: 'Neural engine gotowy.' },
+    });
+  }
+
+  combined.push(
     ...groups.map(g => ({ ...g, isGroup: true, displayName: g.groupName, contactPhone: g._id })),
     ...contacts
-  ];
+  );
 
   const filtered = combined.filter(c =>
     c.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ||

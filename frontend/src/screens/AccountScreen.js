@@ -1,17 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  StyleSheet, 
-  View, 
-  Text, 
-  SafeAreaView, 
-  ScrollView, 
-  Switch, 
-  Modal, 
+import {
+  StyleSheet,
+  View,
+  Text,
+  SafeAreaView,
+  ScrollView,
+  Switch,
+  Modal,
   TextInput,
   Alert,
   ActivityIndicator
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import CyberButton from '../components/CyberButton';
 
 export default function AccountScreen({ navigation }) {
@@ -40,7 +41,7 @@ export default function AccountScreen({ navigation }) {
     loadSettings();
   }, []);
 
-  // Obsługa przełącznika PIN
+  // Obsługa przełącznika PIN (SECURITY FIX: Use SecureStore instead of AsyncStorage)
   const togglePin = async (value) => {
     if (value) {
       setPinInput('');
@@ -48,7 +49,7 @@ export default function AccountScreen({ navigation }) {
     } else {
       setPinEnabled(false);
       await AsyncStorage.setItem('twofa_enabled', 'false');
-      await AsyncStorage.removeItem('twofa_pin');
+      await SecureStore.deleteItemAsync('vextro_twofa_pin');
       Alert.alert('TERMINAL', 'Autoryzacja dwuetapowa została wyłączona.');
     }
   };
@@ -59,7 +60,8 @@ export default function AccountScreen({ navigation }) {
       return;
     }
     await AsyncStorage.setItem('twofa_enabled', 'true');
-    await AsyncStorage.setItem('twofa_pin', pinInput);
+    // SECURITY FIX: Store PIN in SecureStore (device-native encryption)
+    await SecureStore.setItemAsync('vextro_twofa_pin', pinInput);
     setPinEnabled(true);
     setPinModalVisible(false);
     Alert.alert('SYSTEM ZABEZPIECZONY', 'Nowy Terminal PIN został zaszyfrowany i zapisany w bazie pamięci.');

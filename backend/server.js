@@ -52,6 +52,7 @@ app.use('/api/contacts', require('./routes/contacts'));
 app.use('/api/groups', require('./routes/groups'));
 app.use('/api/messages', require('./routes/messages'));
 app.use('/api/media', require('./routes/media')); // Nowa trasa dla audio/obrazów
+app.use('/api/keys', require('./routes/keys')); // Nowa trasa dla kluczy E2EE (X3DH)
 
 // Prosty testowy endpoint (Healthcheck)
 app.get('/', (req, res) => {
@@ -59,11 +60,10 @@ app.get('/', (req, res) => {
 });
 
 // Endpoint autodiscovery dla podłączonych węzłów
-let publicTunnelUrl = null;
 app.get('/api/config/network', (req, res) => {
     res.json({
         success: true,
-        tunnelUrl: publicTunnelUrl,
+        tunnelUrl: process.env.PUBLIC_URL || null,
         localUrl: `http://localhost:${PORT}`,
         timestamp: new Date().toISOString()
     });
@@ -123,35 +123,6 @@ io.on('connection', async (socket) => {
                  },
                  { 'lastMessage.content': data.content, 'lastMessage.timestamp': new Date() }
                );
-
-               // WYSYŁKA PUSH NOTIFICATION (Jeżeli odbiorca nie wyciszył nadawcy)
-               const receiverContactEntry = await Contact.findOne({ ownerPhone: receiverPhone, contactPhone: data.sender });
-               if (!receiverContactEntry || !receiverContactEntry.isMuted) {
-                  const receiverUser = await User.findOne({ phoneNumber: receiverPhone });
-                  if (receiverUser && receiverUser.expoPushToken) {
-                      // Wysyłanie do Expo Push API (Bezpieczna, zanonimizowana wiadomość)
-                      try {
-                          await fetch('https://exp.host/--/api/v2/push/send', {
-                              method: 'POST',
-                              headers: {
-                                  'Accept': 'application/json',
-                                  'Accept-encoding': 'gzip, deflate',
-                                  'Content-Type': 'application/json',
-                              },
-                              body: JSON.stringify({
-                                  to: receiverUser.expoPushToken,
-                                  sound: 'default',
-                                  title: 'VEXTRO SECURE CHANNEL',
-                                  body: 'Zaszyfrowana przesyłka oczekuje na odbiór 🛡️',
-                                  data: { roomId: data.roomId },
-                              })
-                          });
-                          console.log(`📲 [PUSH] Wysłano notyfikację do: ${receiverPhone}`);
-                      } catch(pushErr) {
-                          console.error("Błąd wysyłki PUSH:", pushErr);
-                      }
-                  }
-               }
             }
 
             // Wysyłamy wyłącznie do uczestników pokoju
@@ -178,35 +149,6 @@ io.on('connection', async (socket) => {
                 'lastMessage.timestamp': new Date()
             }, { new: true });
 
-            if (groupData && groupData.members) {
-                 // Push powiadomienia dla pozostałych członków (którzy nie są Senderem)
-                 for (let memberPhone of groupData.members) {
-                     if (memberPhone === data.sender) continue;
-                     
-                     // Tu moglibyśmy dodac flagi "Czy gość wyciszył grupę". Gdy tylko Group.js dostanie takie uprawnienia, zablokujemy stąd.
-                     const receiverUser = await User.findOne({ phoneNumber: memberPhone });
-                     if (receiverUser && receiverUser.expoPushToken) {
-                         try {
-                              await fetch('https://exp.host/--/api/v2/push/send', {
-                                  method: 'POST',
-                                  headers: {
-                                      'Accept': 'application/json',
-                                      'Accept-encoding': 'gzip, deflate',
-                                      'Content-Type': 'application/json',
-                                  },
-                                  body: JSON.stringify({
-                                      to: receiverUser.expoPushToken,
-                                      sound: 'default',
-                                      title: `VEXTRO: ${groupData.groupName}`,
-                                      body: 'Zaszyfrowana przesyłka oczekuje na odbiór 🛡️',
-                                      data: { roomId: data.roomId },
-                                  })
-                              });
-                          } catch(pushErr) {}
-                     }
-                 }
-            }
-
         } catch (err) {
             console.error('❌ Krytyczny błąd obsługi grupy:', err);
         }
@@ -221,8 +163,8 @@ io.on('connection', async (socket) => {
         // WebApp dołącza do pokoju dla tej konkretnej sesji
         socket.join(sessionId);
         
-        // Dynamiczny URL (PRIORYTET: Tunel Publiczny Ngrok)
-        const serverUrl = publicTunnelUrl || (clientData && clientData.serverUrl) || `http://localhost:${PORT}`;
+        // Dynamiczny URL (PRIORYTET: Zmienna środowiskowa PUBLIC_URL lub dane z klienta)
+        const serverUrl = process.env.PUBLIC_URL || (clientData && clientData.serverUrl) || `http://localhost:${PORT}`;
         
         console.log(`🌐 [PREMIUM] WebApp zainicjowała sesję: [${sessionId}]`);
         console.log(`🌐 [PREMIUM] Target Hub Discovery URL: ${serverUrl}`);
@@ -325,34 +267,9 @@ io.on('connection', async (socket) => {
 });
 
 const PORT = process.env.PORT || 5050;
-
+const HOST = '0.0.0.0';
 // '0.0.0.0' sprawia, że serwer akceptuje połączenia z KAŻDEGO adresu IP, 
 // a nie tylko z wewnątrz kontenera.
 server.listen(PORT, '0.0.0.0', async () => {
     console.log("🚀 SERWER VEXTRO OTWARTY NA ŚWIAT: port " + PORT);
-    
-    // --- INTEGRACJA NGROK (MODE PREMIUM) ---
-    try {
-        const ngrok = require('ngrok');
-        const token = process.env.NGROK_AUTHTOKEN;
-        
-        if (token) {
-            console.log("🔑 Znaleziono NGROK_AUTHTOKEN - startuję w trybie PREMIUM.");
-            await ngrok.authtoken(token);
-        } else {
-            console.warn("⚠️ Brak NGROK_AUTHTOKEN - startuję w trybie FREE (sesje wygasają po 2h).");
-        }
-
-        publicTunnelUrl = await ngrok.connect({
-            addr: Number(PORT)
-        });
-        
-        console.log("------------------------------------------");
-        console.log(`💎 VEXTRO GLOBAL TUNNEL: ${publicTunnelUrl}`);
-        console.log("------------------------------------------");
-
-    } catch (err) {
-        console.error("❌ BŁĄD INTEGRACJI NGROK:", err.message);
-        console.log("Kontynuuję start bez tunelu publicznego.");
-    }
 });
