@@ -5,6 +5,8 @@
         "github.vscode-github-actions",
         "eamodio.gitlens",
         "google.geminicodeassist",
-        "google.gemini-cli-vscode-ide-companion"
+        "google.gemini-cli-vscode-ide-companion",
+        "ms-vscode-remote.remote-containers",
+        "ms-vscode-remote.remote-ssh"
     ]
 }

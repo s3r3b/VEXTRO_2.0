@@ -4,22 +4,22 @@ VEXTRO to zaawansowany system komunikacji szyfrowanej, bazujący na architekturz
 
 ## 1. Główne Środowisko (Stack Technologiczny)
 - **Node.js & Express.js** - Wysokowydajny serwer obsługujący API REST oraz WebSockets.
-- **React Native / Expo** - Ekosystem frontendu mobilnego (oraz WebApp poprzez `react-native-web`), pozwalający na współdzielenie kodu kryptograficznego i UI.
+- **React 19 + Vite** - WebApp frontend (desktop/browser), zbudowany z Vite dev server, zamieniając React Native.
+- **Tailwind CSS** - Styling i theming w WebApp.
 - **Socket.io** - Silnik komunikacji czasu rzeczywistego wykorzystywany do routingu wiadomości oraz handshake'u urządzeń.
 - **MongoDB / Mongoose** - Baza danych NoSQL przetrzymująca metadane, relacje kontaktów oraz zaszyfrowane pakiety w formacie ślepym.
 
 ---
 
-## 2. Architektura Bezpieczeństwa: VEXTRO ShieldEngine
+## 2. Architektura Bezpieczeństwa Kryptografii
 
-Sercem prywatności VEXTRO jest autorski moduł `ShieldEngine.js`, implementujący pełny algorytm **Double Ratchet** (Podwójnej Zapadni), inspirowany specyfikacją Signal Protocol. Backend nie posiada kluczy i nie jest w stanie odczytać treści wiadomości.
+**➡️ PEŁNY OPIS**: `KRYPTOGRAFIA.md` (kompendium + niegotowe rzeczy)
 
-### Komponenty ShieldEngine:
-- **Kryptografia Asymetryczna (X25519)**: Wykorzystuje bibliotekę `tweetnacl` (nacl.box) do wymiany kluczy Diffie-Hellman, zapewniając **Post-Compromise Security (PCS)**. Co kilka wiadomości generowana jest nowa para kluczy odświeżająca entropię sesji.
-- **Kryptografia Symetryczna (XSalsa20-Poly1305)**: Wykorzystywana do właściwego szyfrowania wiadomości (`nacl.secretbox`) przy użyciu kluczy generowanych z łańcuchów KDF.
-- **Algorytmy KDF (HKDF-SHA256)**: Implementacja łańcuchów derywacji kluczy (Root Chain, Sending Chain, Receiving Chain). Każda wiadomość korzysta z jednorazowego klucza (Message Key), zapewniając **Forward Secrecy (FS)**.
-- **Mutex (Task Queue)**: Wewnętrzna kolejka asynchroniczna zapobiegająca zjawisku "Race Conditions", gwarantująca spójność liczników wiadomości nawet przy natychmiastowym wysłaniu serii pakietów (ochrona przed desynchronizacją MAC).
-- **Pominięte Klucze (Out-of-Order Messages)**: Mechanizm zrzucania nieużytych kluczy (`skippedMessageKeys`) do słownika, pozwalający na prawidłowe odszyfrowanie wiadomości dostarczonych z opóźnieniem przez sieć.
+Sercem prywatności VEXTRO: `ShieldEngine.js` (Double Ratchet) + X3DH key exchange. Backend **nie ma kluczy prywatnych**.
+
+**Status**: 70% complete
+- ✅ X3DH, OPK consumption, out-of-order messages, DH ratchet
+- ⏳ Group message keys, per-message HMAC signatures, per-message DH ratchet
 
 ---
 
@@ -63,10 +63,17 @@ Projekt kategorycznie odrzuca generyczne biblioteki komponentów na rzecz autors
 - `mongoose` - ODM dla relacji i obiektów bazy.
 - `node-pty` - Generowanie interaktywnych powłok systemowych.
 - `cors`, `dotenv` - Bezpieczeństwo i konfiguracja.
+- `tweetnacl` - Kryptografia X25519 + nacl.box, używana w ShieldEngine (Double Ratchet).
+- `multer` - Upload plików (media: audio, obrazy) do `uploads/`.
+- `form-data`, `axios` - Obsługa żądań HTTP z payload'em.
+- `crypto-js` - Dodatkowe operacje kryptograficzne.
+- `node-bash-title` - Utility dla tytułów procesów.
 
-**Frontend / Mobile / WebApp:**
-- **Expo Core**: `expo`, `expo-av`, `expo-camera`, `expo-crypto`, `expo-secure-store`, `expo-file-system`, `expo-haptics`, `expo-linear-gradient`.
-- **Kryptografia**: `tweetnacl` (NACL), własna implementacja `hmacSha256`.
-- **UI / Nawigacja**: `@react-navigation/native`, `@react-navigation/stack`, `react-native-svg`, `react-native-qrcode-svg`.
+**WebApp (React 19 + Vite):**
+- **Build/Dev**: `vite`, `@vitejs/plugin-react` - Build tool i dev server.
+- **Styling**: `tailwindcss` - Utility CSS framework.
+- **UI/UX**: `framer-motion` (animacje, transitions), `qrcode.react` (QR code generacja), `lucide-react` (ikony).
+- **Routing**: `react-router-dom` - Routing aplikacji (/login, /chat).
+- **Kryptografia**: `tweetnacl` (NACL), `buffer` (polyfill), własna implementacja `hmacSha256`.
 - **Komunikacja**: `axios` (żądania REST), `socket.io-client` (komunikacja real-time).
-- **Stan i Cache**: `@react-native-async-storage/async-storage`, LocalStorage (dla WebApp).
+- **Stan**: `localStorage` (browser storage).
