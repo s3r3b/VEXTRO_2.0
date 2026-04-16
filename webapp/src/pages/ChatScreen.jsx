@@ -199,6 +199,7 @@ export default function ChatScreen() {
 
           } catch (apiErr) {
             console.warn("❌ [X3DH] Błąd nowego API, fallback do WebSocket:", apiErr);
+              
             
             // FALLBACK - stary sposób po WebSocket (np. gdy serwer zwróci 404 dla kluczy)
             if (!sessions[activeContact.contactPhone]) {
