@@ -21,6 +21,7 @@ const StorageManager = {
     LEGACY_IDENTITY_PUBLIC: 'vextro_identity_public',
     LEGACY_USER_PHONE: 'userPhone',
     LEGACY_IDENTITY_PRIVATE: 'vextro_identity_private',
+
     LEGACY_CUSTOM_HUB: 'vextro_custom_hub',
   },
 
@@ -37,14 +38,30 @@ const StorageManager = {
     console.log('✅ [STORAGE] Cleared.');
   },
 
-  /**
-   * Set X3DH local keys (private keys)
+ /**
+   * Set X3DH local keys (ZMODYFIKOWANE: Ekstrakcja klucza prywatnego dla ShieldContext)
    * @param {Object} localKeys - { identityKeyPriv, signedPreKeyPriv, oneTimePreKeysPriv }
    */
   setX3DHKeys(localKeys) {
     if (!localKeys) throw new Error('StorageManager: Invalid X3DH local keys');
-    localStorage.setItem(this.KEYS.X3DH_LOCAL_KEYS, JSON.stringify(localKeys));
-    console.log('✅ [STORAGE] X3DH local keys saved.');
+    try {
+      // 1. Zapis pełnej paczki jako JSON
+      localStorage.setItem(this.KEYS.X3DH_LOCAL_KEYS, JSON.stringify(localKeys));
+      
+     // 2. WYCIĄGNIĘCIE I ZAPIS LEGACY (Krytyczne dla ShieldContext.jsx)
+      if (localKeys.identityKeyPriv) {
+        localStorage.setItem('vextro_identity_private', localKeys.identityKeyPriv);
+      }
+      // NOWE: Zapis poprawnego klucza Curve25519 (ECDH) dla sesji X3DH
+      if (localKeys.dhPrivKey) {
+        localStorage.setItem('vextro_dh_private', localKeys.dhPrivKey);
+      }
+      
+      console.log('✅ [STORAGE] X3DH local keys saved & unbundled.');
+    } catch (e) {
+      console.error('❌ [STORAGE] Error saving X3DH keys:', e);
+      throw e;
+    }
   },
 
   /**
@@ -63,12 +80,18 @@ const StorageManager = {
   },
 
   /**
-   * Set user phone
+   * Set user phone (ZMODYFIKOWANE: Zapis podwójny dla kompatybilności)
    * @param {string} phone - Phone number
    */
   setUserPhone(phone) {
-    localStorage.setItem(this.KEYS.USER_PHONE, phone);
-    console.log(`✅ [STORAGE] User phone set: ${phone}`);
+    try {
+      localStorage.setItem(this.KEYS.USER_PHONE, phone); // Nowy standard
+      localStorage.setItem('userPhone', phone); // LEGACY (czyta to ChatScreen)
+      console.log(`✅ [STORAGE] User phone set: ${phone}`);
+    } catch (e) {
+      console.error('❌ [STORAGE] Error saving phone:', e);
+      throw e;
+    }
   },
 
   /**
@@ -80,12 +103,18 @@ const StorageManager = {
   },
 
   /**
-   * Set identity public key (X3DH identity key public)
+   * Set identity public key (ZMODYFIKOWANE: Zapis podwójny dla kompatybilności)
    * @param {string} publicKey - Base64 encoded Ed25519 public key
    */
   setIdentityPublic(publicKey) {
-    localStorage.setItem(this.KEYS.IDENTITY_PUBLIC, publicKey);
-    console.log(`✅ [STORAGE] Identity public key set: ${publicKey.substring(0, 12)}...`);
+    try {
+      localStorage.setItem(this.KEYS.IDENTITY_PUBLIC, publicKey); // Nowy standard
+      localStorage.setItem('vextro_identity_public', publicKey); // LEGACY
+      console.log(`✅ [STORAGE] Identity public key set: ${publicKey.substring(0, 12)}...`);
+    } catch (e) {
+      console.error('❌ [STORAGE] Error saving identity public key:', e);
+      throw e;
+    }
   },
 
   /**

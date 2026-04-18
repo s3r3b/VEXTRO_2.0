@@ -98,7 +98,7 @@ export const ShieldProvider = ({ children }) => {
    */
   const generateGroupKeyAndEnvelopes = (membersList) => {
     const groupSecretKey = nacl.randomBytes(32);
-    const myPrivKeyRaw = localStorage.getItem('vextro_identity_private');
+    const myPrivKeyRaw = localStorage.getItem('vextro_dh_private');
     const myPrivKey = Buffer.from(myPrivKeyRaw, 'base64');
     
     const envelopes = membersList.map(member => {
@@ -120,7 +120,7 @@ export const ShieldProvider = ({ children }) => {
    * [GROUP] Setup a group channel from the envelope received from the backend
    */
   const setupGroupSession = (groupId, encryptedKeyRaw, nonceRaw, adminPublicKeyRaw) => {
-    const myPrivKeyRaw = localStorage.getItem('vextro_identity_private');
+    const myPrivKeyRaw = localStorage.getItem('vextro_dh_private');
     const myPrivKey = Buffer.from(myPrivKeyRaw, 'base64');
     const adminPubKey = Buffer.from(adminPublicKeyRaw, 'base64');
     

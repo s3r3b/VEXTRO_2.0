@@ -69,17 +69,29 @@ async function kdfChain(ck) {
 
 export class ShieldSession {
   constructor(state = {}) {
+    // --- VEXTRO REHYDRATION FIX ---
+    // Przywraca ułomne obiekty JSON z localStorage z powrotem do czystego Uint8Array
+    const restoreKey = (key) => {
+      if (!key) return null;
+      if (key instanceof Uint8Array) return key;
+      if (key.type === 'Buffer' && key.data) return new Uint8Array(key.data);
+      if (typeof key === 'object') return new Uint8Array(Object.values(key));
+      return key;
+    };
+
     this.state = {
-      rootKey: state.rootKey || null,
-      sendingChain: state.sendingChain || null,
-      receivingChain: state.receivingChain || null,
-      dhKeyPair: state.dhKeyPair || nacl.box.keyPair(),
-      remoteDhPublicKey: state.remoteDhPublicKey || null,
+      rootKey: restoreKey(state.rootKey),
+      sendingChain: restoreKey(state.sendingChain),
+      receivingChain: restoreKey(state.receivingChain),
+      dhKeyPair: state.dhKeyPair ? {
+        publicKey: restoreKey(state.dhKeyPair.publicKey),
+        secretKey: restoreKey(state.dhKeyPair.secretKey)
+      } : nacl.box.keyPair(),
+      remoteDhPublicKey: restoreKey(state.remoteDhPublicKey),
       sendingCounter: state.sendingCounter || 0,
       receivingCounter: state.receivingCounter || 0,
       previousCounter: state.previousCounter || 0,
       skippedMessageKeys: state.skippedMessageKeys || {}, // { ratchetId_counter: key }
-      ...state
     };
     
     // 🛡️ VEXTRO MUTEX: Task Queue dla asynchronicznych operacji kryptograficznych

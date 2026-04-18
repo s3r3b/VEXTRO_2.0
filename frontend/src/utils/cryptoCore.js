@@ -32,9 +32,10 @@ export const generateX3DHBundle = () => {
     oneTimePreKeysPrivate.push({ id: opkId, privKey: opkPrivBase64 });
   }
 
-  // Paczka do wysłania na serwer
+ // Paczka do wysłania na serwer (ZMODYFIKOWANE)
   const bundle = {
-    identityKey: identityKeyPubBase64,
+    identityKey: identityKeyPubBase64, // Ed25519 (Tylko do autoryzacji/podpisów)
+    dhPublicKey: spkBase64,            // NOWE: Curve25519 (Klucz publiczny do wymiany P2P)
     signedPreKey: {
       key: spkBase64,
       signature: signatureBase64
@@ -42,12 +43,15 @@ export const generateX3DHBundle = () => {
     oneTimePreKeys: oneTimePreKeys
   };
 
-  // Klucze prywatne zatrzymywane na urządzeniu (do zapisu lokalnego)
+  // Klucze prywatne zatrzymywane na urządzeniu (ZMODYFIKOWANE)
   const localKeys = {
-    identityKeyPriv: identityKeyPrivBase64,
+    identityKeyPriv: identityKeyPrivBase64, // Ed25519
+    dhPrivKey: spkPrivBase64,               // NOWE: Curve25519 (Do funkcji nacl.box)
     signedPreKeyPriv: spkPrivBase64,
     oneTimePreKeysPriv: oneTimePreKeysPrivate
   };
+
+  return { bundle, localKeys };
 
   return { bundle, localKeys };
 };

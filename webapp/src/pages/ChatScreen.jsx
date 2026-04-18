@@ -60,7 +60,8 @@ export default function ChatScreen() {
         } catch (err) { console.warn("Shield Init Error:", err); }
       } else if (!activeContact.isGroup && activeContact.publicKey && !sessions[activeContact.contactPhone]) {
         try {
-          const myPriv = localStorage.getItem('vextro_identity_private');
+          // POPRAWIONE: Ładujemy klucz Curve25519 zamiast klucza do podpisów (Ed25519)
+          const myPriv = localStorage.getItem('vextro_dh_private');
           const nacl = await import('tweetnacl');
           const { Buffer } = await import('buffer');
           const secret = nacl.default.box.before(
@@ -170,24 +171,35 @@ export default function ChatScreen() {
         } else {
           // --- NOWY FLOW API X3DH ---
           try {
-            console.log("🔑 [X3DH] Pobieranie kluczy odbiorcy:", activeContact.contactPhone);
-            const receiverKeys = await apiService.fetchReceiverKeys(activeContact.contactPhone);
-            console.log("🔑 [X3DH] Pobrane klucze:", receiverKeys);
+            console.log("🔑 [X3DH] Szyfrowanie wiadomości do:", activeContact.contactPhone);
             
-            // Symulacja szyfrowania X3DH (Zastąpi dotychczasowe encryptFor)
-            const simulatedEncryptedPayload = `[SIMULATED_X3DH_ENCRYPTED: ${text}]`;
+            // 1. Prawdziwe szyfrowanie P2P z użyciem silnika ShieldEngine
+            const { header, ciphertext, nonce } = await encryptFor(activeContact.contactPhone, text);
             
-            console.log("🚀 Wysyłanie przez nowe API messages/send...");
+            // 2. Pakujemy zaszyfrowane elementy do jednego stringa JSON (MongoDB przechowa to bezpiecznie)
+            const securePayload = JSON.stringify({ ciphertext, header, nonce });
+            
+            console.log("🚀 Wysyłanie zaszyfrowanego payloadu przez nowe API...");
             await apiService.sendMessage({
               sender: myPhone,
               receiver: activeContact.contactPhone,
-              payload: simulatedEncryptedPayload,
+              payload: securePayload, // <-- Twardy ciphertext, ZERO plaintekstu
               messageType: type
             });
-            console.log("✅ Wiadomość wysłana do serwera (API).");
+            console.log("✅ Wiadomość (ZASZYFROWANA) wysłana do serwera (API).");
             
+            // ODBLOKOWANIE REAL-TIME: Równoległy strzał po web-sockecie do odbiorcy
+            socketRef.current.emit('send_message', {
+              ...msgPayload,
+              content: ciphertext,
+              header: header,
+              nonce: nonce,
+              isEncrypted: true
+            });
+
           } catch (apiErr) {
             console.warn("❌ [X3DH] Błąd nowego API, fallback do WebSocket:", apiErr);
+              
             
             // FALLBACK - stary sposób po WebSocket (np. gdy serwer zwróci 404 dla kluczy)
             if (!sessions[activeContact.contactPhone]) {

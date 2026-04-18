@@ -7,6 +7,8 @@
         "google.geminicodeassist",
         "google.gemini-cli-vscode-ide-companion",
         "ms-vscode-remote.remote-containers",
-        "ms-vscode-remote.remote-ssh"
+        "ms-vscode-remote.remote-ssh",
+        "lucaslabs.lucodear-icons",
+        "julianperezpesce.dragonfu"
     ]
 }
