@@ -98,16 +98,12 @@ io.on('connection', async (socket) => {
                 return;
             }
 
-            const newMessage = new Message({
-                roomId: data.roomId,
-                sender: data.sender,
-                content: data.content
-            });
-            await newMessage.save();
+            // UWAGA: Socket nie zapisuje już wiadomości do kolekcji Messages!
+            // Za ten proces odpowiada teraz bezpieczne API (routes/messages.js), 
+            // a Socket służy wyłącznie do przesyłania powiadomień w czasie rzeczywistym.
 
-            // Zaktualizuj Contact
+            // Zaktualizuj Contact - tylko preview (lastMessage) na pasku kontaktów
             const Contact = require('./models/Contact');
-            const User = require('./models/User');
             const phones = data.roomId.split('-');
             
             if (phones.length === 2) {
@@ -125,10 +121,10 @@ io.on('connection', async (socket) => {
                );
             }
 
-            // Wysyłamy wyłącznie do uczestników pokoju
+            // Wysyłamy wyłącznie do uczestników pokoju (sygnał "Masz nową wiadomość, dekoduj!")
             socket.to(data.roomId).emit('receive_message', data);
         } catch (err) {
-            console.error('❌ Krytyczny błąd zapisu wiadomości:', err);
+            console.error('❌ Krytyczny błąd obsługi socketu wiadomości:', err);
         }
     });
 

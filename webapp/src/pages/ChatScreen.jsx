@@ -58,18 +58,41 @@ export default function ChatScreen() {
             if (adminUser) setupGroupSession(activeContact._id, me.encryptedKey, me.nonce || 'EMPTY', adminUser.publicKey);
           }
         } catch (err) { console.warn("Shield Init Error:", err); }
-      } else if (!activeContact.isGroup && activeContact.publicKey && !sessions[activeContact.contactPhone]) {
+      } else if (!activeContact.isGroup && activeContact.contactPhone && !sessions[activeContact.contactPhone]) {
         try {
-          // POPRAWIONE: Ładujemy klucz Curve25519 zamiast klucza do podpisów (Ed25519)
+          console.log(`Pobieranie paczki X3DH dla: ${activeContact.contactPhone}`);
+         // 1. ZACIĄGAMY POPRAWNY KLUCZ X25519 Z API! (Olej activeContact.publicKey)
+          const receiverKeys = await apiService.fetchReceiverKeys(activeContact.contactPhone);
+          
+          // API zwraca obiekt bezpośrednio. Priorytetyzujemy One-Time PreKey (OPK) dla Forward Secrecy, 
+          // a w ostateczności używamy Signed PreKey (SPK).
+          const curve25519PubKey = (receiverKeys.oneTimePreKey && receiverKeys.oneTimePreKey.key) || 
+                                   (receiverKeys.signedPreKey && receiverKeys.signedPreKey.key);
+
+          console.log(`[SHIELD DEBUG] Pobrany klucz Curve25519 rozmówcy:`, curve25519PubKey ? 'JEST' : 'BRAK');
+
+          if (!curve25519PubKey) throw new Error("Odbiorca nie ma zarejestrowanych kluczy Curve25519!");
+
+          // 2. Ładujemy lokalny prywatny klucz X25519 (NAPRAWIONE W FAZIE 1/2)
           const myPriv = localStorage.getItem('vextro_dh_private');
-          const nacl = await import('tweetnacl');
+          if (!myPriv) throw new Error("Brak lokalnego klucza vextro_dh_private!");
+
+          const ObjectNacl = await import('tweetnacl');
+          const nacl = ObjectNacl.default || ObjectNacl;
           const { Buffer } = await import('buffer');
-          const secret = nacl.default.box.before(
-            Buffer.from(activeContact.publicKey, 'base64'),
+          
+          // 3. OBLICZAMY SEKRET: (X25519_Remote_Pub, X25519_Local_Priv) -> BANG! Działa.
+          const secret = nacl.box.before(
+            Buffer.from(curve25519PubKey, 'base64'),
             Buffer.from(myPriv, 'base64')
           );
-          await startSession(activeContact.contactPhone, activeContact.publicKey, secret);
-        } catch (err) { console.error("Session Start Error", err); }
+          
+          // 4. Start sesji - zapisujemy Curve25519 jako klucz publiczny rozmówcy
+          await startSession(activeContact.contactPhone, curve25519PubKey, secret);
+          console.log(`✅ [SHIELD] Sesja E2EE nawiązana z ${activeContact.contactPhone}`);
+        } catch (err) { 
+          console.error("❌ [SHIELD] Błąd inicjalizacji sesji P2P:", err); 
+        }
       }
     };
 
@@ -129,6 +152,56 @@ export default function ChatScreen() {
     };
   }, [activeContact, isAI, myPhone, sessions, groupKeys, decryptFrom, decryptFromGroup]);
 
+// 4. POLLING: Wyciąganie wiadomości z czarnej dziury (MongoDB)
+  useEffect(() => {
+    // Nie pollujemy dla AI ani jeśli nie mamy kluczy sesji
+    if (isAI || !activeContact || activeContact.isGroup || !sessions[activeContact.contactPhone]) return;
+
+    const pollMessages = async () => {
+      try {
+        const data = await apiService.retrieveMessages(myPhone);
+        if (!data || !data.messages || data.messages.length === 0) return;
+
+        console.log(`📥 [API] Pobrano ${data.messages.length} zakolejkowanych wiadomości.`);
+
+        for (const msg of data.messages) {
+          // Jeżeli to nasza wiadomość lub nie jest z tego pokoju - ignoruj
+          if (msg.sender === myPhone || msg.sender !== activeContact.contactPhone) continue;
+
+          try {
+            // MongoDB przechowuje JSON w polu payload/encryptedPayload
+            const secureData = JSON.parse(msg.payload || msg.encryptedPayload || msg.content);
+            const { ciphertext, header, nonce } = secureData;
+
+            // Dekodowanie
+            const plaintext = await decryptFrom(msg.sender, header, ciphertext, nonce);
+            
+            // Wrzucamy do UI, zapobiegając duplikatom
+            setMessages(prev => {
+              if (prev.some(m => m._id === msg._id || m.nonce === nonce)) return prev;
+              return [...prev, { ...msg, content: plaintext, isEncrypted: false }];
+            });
+
+          } catch (decErr) {
+            console.warn("❌ [SHIELD] Błąd dekodowania z pollingu:", decErr);
+            setMessages(prev => {
+              if (prev.some(m => m._id === msg._id)) return prev;
+              return [...prev, { ...msg, content: '[BŁĄD DEKODOWANIA - ZŁE KLUCZE]', isEncrypted: true }];
+            });
+          }
+        }
+      } catch (err) {
+        // Cichy fail dla pollingu, żeby nie spamować konsoli, jeśli serwer np. rzuci 404 (brak nowych)
+      }
+    };
+
+    const interval = setInterval(pollMessages, 3000);
+    // Odpal raz od razu po wejściu w kontakt
+    pollMessages();
+
+    return () => clearInterval(interval);
+  }, [myPhone, activeContact, isAI, sessions, decryptFrom]);
+
   const handleSendMessage = async (text, type = 'text', duration = 0, mediaPayload = null) => {
     if (!text && type === 'text') return;
     const timestamp = new Date().toISOString();
@@ -158,7 +231,7 @@ export default function ChatScreen() {
         mediaUrl: type === 'voice' ? text : null
       };
 
-      try {
+     try {
         if (activeContact.isGroup) {
           // ... logic grupowy
           if (!groupKeys[activeContact._id]) {
@@ -170,7 +243,7 @@ export default function ChatScreen() {
           socketRef.current.emit('send_group_message', encryptedPayload);
         } else {
           // --- NOWY FLOW API X3DH ---
-          try {
+        try {
             console.log("🔑 [X3DH] Szyfrowanie wiadomości do:", activeContact.contactPhone);
             
             // 1. Prawdziwe szyfrowanie P2P z użyciem silnika ShieldEngine
@@ -200,7 +273,6 @@ export default function ChatScreen() {
           } catch (apiErr) {
             console.warn("❌ [X3DH] Błąd nowego API, fallback do WebSocket:", apiErr);
               
-            
             // FALLBACK - stary sposób po WebSocket (np. gdy serwer zwróci 404 dla kluczy)
             if (!sessions[activeContact.contactPhone]) {
               alert("Brak kluczy na serwerze i brak sesji P2P. Zapadnia zamknięta.");

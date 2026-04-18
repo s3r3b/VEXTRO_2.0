@@ -9,6 +9,7 @@
         "ms-vscode-remote.remote-containers",
         "ms-vscode-remote.remote-ssh",
         "lucaslabs.lucodear-icons",
-        "julianperezpesce.dragonfu"
+        "julianperezpesce.dragonfu",
+        "ms-azuretools.vscode-containers"
     ]
 }
