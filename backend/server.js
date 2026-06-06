@@ -53,6 +53,9 @@ app.use('/api/groups', require('./routes/groups'));
 app.use('/api/messages', require('./routes/messages'));
 app.use('/api/media', require('./routes/media')); // Nowa trasa dla audio/obrazów
 
+
+
+// tutaj sie pozmnielailo i musi byc commit
 // Prosty testowy endpoint (Healthcheck)
 app.get('/', (req, res) => {
     res.send('VEXTRO Backend is Online');
