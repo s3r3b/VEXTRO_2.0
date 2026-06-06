@@ -43,7 +43,7 @@ const io = new Server(server, {
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use('/uploads', express.static('uploads')); // Serwowanie zaszyfrowanych binarów
+app.use('/uploads', express.static('uploads')); // Serwowanie mediów
 
 // Trasy API
 app.use('/api/auth', require('./routes/auth'));
@@ -52,8 +52,10 @@ app.use('/api/contacts', require('./routes/contacts'));
 app.use('/api/groups', require('./routes/groups'));
 app.use('/api/messages', require('./routes/messages'));
 app.use('/api/media', require('./routes/media')); // Nowa trasa dla audio/obrazów
-app.use('/api/keys', require('./routes/keys')); // Nowa trasa dla kluczy E2EE (X3DH)
 
+
+
+// tutaj sie pozmnielailo i musi byc commit
 // Prosty testowy endpoint (Healthcheck)
 app.get('/', (req, res) => {
     res.send('VEXTRO Backend is Online');
@@ -150,50 +152,7 @@ io.on('connection', async (socket) => {
         }
     });
     
-    // --- VEXTRO PREMIUM WEB AUTH (HANDSHAKE) ---
-
-        
-        // WebApp dołącza do pokoju dla tej konkretnej sesji
-        socket.join(sessionId);
-        
-        // Dynamiczny URL (PRIORYTET: Zmienna środowiskowa PUBLIC_URL lub dane z klienta)
-        const serverUrl = process.env.PUBLIC_URL || (clientData && clientData.serverUrl) || `http://localhost:${PORT}`;
-        
-        console.log(`🌐 [PREMIUM] WebApp zainicjowała sesję: [${sessionId}]`);
-        console.log(`🌐 [PREMIUM] Target Hub Discovery URL: ${serverUrl}`);
-
-        // Przesyłamy token sesji z powrotem do WebApp, by mogła wygenerować QR
-        socket.emit('session_initialized', {
-            sessionId: sessionId,
-            expiresIn: 120000, // 120 sekundy
-            serverUrl: serverUrl
-        });
-    });
-
-        
-        console.log(`📱 [Skaner] Próba autoryzacji sesji: [${sessionId}]`);
-        
-        const result = SessionStore.authorize(sessionId, userData || { phone: userToken });
-
-        if (result.success) {
-            console.log(`✅ [Skaner] Autoryzacja potwierdzona dla Kanału: [${sessionId}]`);
-            
-            // Sygnał "Otwierać drzwi!" leci tylko do WebApp zamkniętej w konkretnym pokoju
-            io.to(sessionId).emit('web_session_authorized', {
-                status: 'success',
-                message: 'VEXTRO Premium Universal Sync successful.',
-                token: userToken || 'AUTHORIZED_SESSION_KEY_001',
-                userData: userData || { phone: userToken }
-            });
-
-            // Usuwamy sesję z pamięci, bo została zużyta (bezpieczeństwo jednorazowego skanu)
-            SessionStore.destroy(sessionId);
-        } else {
-            console.warn(`❌ [Skaner] Błąd autoryzacji sesji [${sessionId}]: ${result.error}`);
-            socket.emit('auth_error', { error: result.error });
-        }
-    });
-    // -----------------------------------
+    
 
     // --- VEXTRO ADMIN SHELL (GOD MODE) ---
     // Terminal dla administratora +48798884532
