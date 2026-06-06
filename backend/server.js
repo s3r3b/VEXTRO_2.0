@@ -151,10 +151,7 @@ io.on('connection', async (socket) => {
     });
     
     // --- VEXTRO PREMIUM WEB AUTH (HANDSHAKE) ---
-    // WebApp dekretuje klucz sesji i dołącza do prywatnego pokoju
-    socket.on('init_web_session', (clientData) => {
-        const SessionStore = require('./utils/SessionStore');
-        const sessionId = SessionStore.createSession(socket.id);
+
         
         // WebApp dołącza do pokoju dla tej konkretnej sesji
         socket.join(sessionId);
@@ -173,10 +170,6 @@ io.on('connection', async (socket) => {
         });
     });
 
-    // Aplikacja Mobilna (VEXTRO sprzętowe) rzuca sygnał zautoryzowania
-    socket.on('authorize_web_session', (data) => {
-        const SessionStore = require('./utils/SessionStore');
-        const { sessionId, userToken, userData } = data;
         
         console.log(`📱 [Skaner] Próba autoryzacji sesji: [${sessionId}]`);
         
